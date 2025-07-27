@@ -71,7 +71,7 @@ class _VideoIconPlaceholderState extends State<VideoIconPlaceholder>
   @override
   void dispose() {
     _animationController.dispose();
-    
+    super.dispose();
   }
 
   @override
