@@ -656,95 +656,82 @@ class _VideoFeedItemState extends ConsumerState<VideoFeedItem>
     }
   }
 
-  Widget _buildNotLoadedState() => Align(
-        alignment: Alignment.topCenter,
-        child: AspectRatio(
-          aspectRatio: 1.0, // Force same square aspect ratio as videos
-          child: Container(
-            color: Colors.grey[900],
-            child: const Center(
-              child: Icon(
-                Icons.video_library_outlined,
-                size: 64,
-                color: Colors.white54,
-              ),
-            ),
+  Widget _buildNotLoadedState() => Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: Colors.grey[900],
+        child: const Center(
+          child: Icon(
+            Icons.video_library_outlined,
+            size: 64,
+            color: Colors.white54,
           ),
         ),
       );
 
   Widget _buildLoadingState() {
-    // If we have a thumbnail, show it with a loading overlay using the same square aspect ratio as videos
+    // If we have a thumbnail, show it full screen with loading overlay
     if (widget.video.thumbnailUrl != null && widget.video.thumbnailUrl!.isNotEmpty) {
-      return Align(
-        alignment: Alignment.topCenter,
-        child: AspectRatio(
-          aspectRatio: 1.0, // Force same square aspect ratio as videos
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Display thumbnail as background with square cropping
-              ClipRect(
-                child: OverflowBox(
-                  alignment: Alignment.center,
-                  child: FittedBox(
-                    fit: BoxFit.cover, // Cover the square area, cropping if necessary
-                    child: Image.network(
-                      widget.video.thumbnailUrl!,
-                      errorBuilder: (context, error, stackTrace) {
-                        // Fallback if thumbnail fails to load
-                        return Container(
-                          width: 400, // Provide a default size for fallback
-                          height: 400,
-                          color: Colors.grey[900],
-                          child: const Icon(
-                            Icons.video_library_outlined,
-                            size: 64,
-                            color: Colors.white54,
-                          ),
-                        );
-                      },
+      return SizedBox(
+        width: double.infinity,
+        height: double.infinity,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Display thumbnail as background filling full screen
+            Image.network(
+              widget.video.thumbnailUrl!,
+              fit: BoxFit.cover,  // Cover the entire screen, cropping if necessary
+              width: double.infinity,
+              height: double.infinity,
+              errorBuilder: (context, error, stackTrace) {
+                // Fallback if thumbnail fails to load
+                return Container(
+                  width: double.infinity,
+                  height: double.infinity,
+                  color: Colors.grey[900],
+                  child: const Center(
+                    child: Icon(
+                      Icons.video_library_outlined,
+                      size: 64,
+                      color: Colors.white54,
                     ),
                   ),
-                ),
+                );
+              },
+            ),
+            // Semi-transparent overlay
+            Container(
+              color: Colors.black.withValues(alpha: 0.3),
+            ),
+            // Loading indicator
+            const Center(
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 3,
               ),
-              // Semi-transparent overlay
-              Container(
-                color: Colors.black.withValues(alpha: 0.3),
-              ),
-              // Loading indicator
-              const Center(
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 3,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
     
-    // Fallback loading state without thumbnail - also use square aspect ratio for consistency
-    return Align(
-      alignment: Alignment.topCenter,
-      child: AspectRatio(
-        aspectRatio: 1.0, // Force same square aspect ratio as videos
-        child: Container(
-          color: Colors.grey[900],
-          child: const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(color: Colors.white),
-                SizedBox(height: 16),
-                Text(
-                  'Loading...',
-                  style: TextStyle(color: Colors.white54),
-                ),
-              ],
+    // Fallback loading state without thumbnail - full screen
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: Colors.grey[900],
+      child: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: Colors.white),
+            SizedBox(height: 16),
+            Text(
+              'Loading...',
+              style: TextStyle(color: Colors.white54),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -784,109 +771,128 @@ class _VideoFeedItemState extends ConsumerState<VideoFeedItem>
       return _buildNotLoadedState();
     }
 
-    // Always use square aspect ratio but make it fill the full width
-    const squareAspectRatio = 1.0;
-
     // Web platform needs special handling for video tap events
     if (kIsWeb) {
-      return AspectRatio(
-        aspectRatio: squareAspectRatio, // Keep square aspect ratio
-          child: MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () {
-                Log.debug(
-                    'Web video tap detected for ${widget.video.id.substring(0, 8)}...',
+      return SizedBox(
+        width: double.infinity,
+        height: double.infinity,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: () {
+              Log.debug(
+                  'Web video tap detected for ${widget.video.id.substring(0, 8)}...',
+                  name: 'VideoFeedItem',
+                  category: LogCategory.ui);
+              if (_controller != null &&
+                  _controller!.value.isInitialized &&
+                  !_controller!.value.hasError) {
+                Log.info('Web video tap conditions met, toggling play/pause',
+                    name: 'VideoFeedItem', category: LogCategory.ui);
+                _togglePlayPause();
+              } else {
+                Log.error(
+                    'Web video tap ignored - controller: ${_controller != null}, initialized: ${_controller?.value.isInitialized}, hasError: ${_controller?.value.hasError}',
                     name: 'VideoFeedItem',
                     category: LogCategory.ui);
-                if (_controller != null &&
-                    _controller!.value.isInitialized &&
-                    !_controller!.value.hasError) {
-                  Log.info('Web video tap conditions met, toggling play/pause',
-                      name: 'VideoFeedItem', category: LogCategory.ui);
-                  _togglePlayPause();
-                } else {
-                  Log.error(
-                      'Web video tap ignored - controller: ${_controller != null}, initialized: ${_controller?.value.isInitialized}, hasError: ${_controller?.value.hasError}',
-                      name: 'VideoFeedItem',
-                      category: LogCategory.ui);
-                }
-              },
-              child: ClipRect(
-                child: OverflowBox(
-                  alignment: Alignment.center,
-                  child: FittedBox(
-                    fit: BoxFit.cover, // Cover the square area, cropping if necessary
-                    child: Stack(
-                      children: [
-                        SizedBox(
-                          width: _controller!.value.size.width,
-                          height: _controller!.value.size.height,
-                          child: VideoPlayer(_controller!),
-                        ),
-                        // Extra transparent layer for web gesture capture
-                        Positioned.fill(
-                          child: Container(
-                            color: Colors.transparent,
-                          ),
-                        ),
-                      ],
+              }
+            },
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Show thumbnail as background to prevent flash
+                if (widget.video.thumbnailUrl != null && widget.video.thumbnailUrl!.isNotEmpty)
+                  Image.network(
+                    widget.video.thumbnailUrl!,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: Colors.grey[900],
                     ),
                   ),
+                // Video fills entire screen, cropped to fit (only show when playing)
+                if (_controller!.value.isInitialized && _controller!.value.isPlaying)
+                  FittedBox(
+                    fit: BoxFit.cover,
+                    child: SizedBox(
+                      width: _controller!.value.size.width,
+                      height: _controller!.value.size.height,
+                      child: VideoPlayer(_controller!),
+                    ),
+                  ),
+                // Extra transparent layer for web gesture capture
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.transparent,
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
-        );
+        ),
+      );
     }
 
-    // Native platform (mobile) - full width square
-    return AspectRatio(
-      aspectRatio: squareAspectRatio, // Keep square aspect ratio
-      child: ClipRect(
-        child: OverflowBox(
-          alignment: Alignment.center,
-          child: FittedBox(
-            fit: BoxFit.cover, // Cover the square area, cropping if necessary
-            child: GestureDetector(
-              onTap: () {
-                Log.debug(
-                    'Native video tap detected for ${widget.video.id.substring(0, 8)}...',
-                    name: 'VideoFeedItem',
-                    category: LogCategory.ui);
-                if (_controller != null &&
-                    _controller!.value.isInitialized &&
-                    !_controller!.value.hasError) {
-                  Log.info('Native video tap conditions met, toggling play/pause',
-                      name: 'VideoFeedItem', category: LogCategory.ui);
-                  _togglePlayPause();
-                } else {
-                  Log.error(
-                      'Native video tap ignored - controller: ${_controller != null}, initialized: ${_controller?.value.isInitialized}, hasError: ${_controller?.value.hasError}',
-                      name: 'VideoFeedItem',
-                      category: LogCategory.ui);
-                }
-              },
-              child: SizedBox(
-                width: _controller!.value.size.width,
-                height: _controller!.value.size.height,
-                child: VideoPlayer(_controller!),
+    // Native platform (mobile) - full screen
+    return SizedBox(
+      width: double.infinity,
+      height: double.infinity,
+      child: GestureDetector(
+        onTap: () {
+          Log.debug(
+              'Native video tap detected for ${widget.video.id.substring(0, 8)}...',
+              name: 'VideoFeedItem',
+              category: LogCategory.ui);
+          if (_controller != null &&
+              _controller!.value.isInitialized &&
+              !_controller!.value.hasError) {
+            Log.info('Native video tap conditions met, toggling play/pause',
+                name: 'VideoFeedItem', category: LogCategory.ui);
+            _togglePlayPause();
+          } else {
+            Log.error(
+                'Native video tap ignored - controller: ${_controller != null}, initialized: ${_controller?.value.isInitialized}, hasError: ${_controller?.value.hasError}',
+                name: 'VideoFeedItem',
+                category: LogCategory.ui);
+          }
+        },
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Show thumbnail as background to prevent flash
+            if (widget.video.thumbnailUrl != null && widget.video.thumbnailUrl!.isNotEmpty)
+              Image.network(
+                widget.video.thumbnailUrl!,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: Colors.grey[900],
+                ),
               ),
-            ),
-          ),
+            // Video fills entire screen, cropped to fit (only show when playing)
+            if (_controller!.value.isInitialized && _controller!.value.isPlaying)
+              FittedBox(
+                fit: BoxFit.cover, // Cover the entire screen, cropping if necessary
+                child: SizedBox(
+                  width: _controller!.value.size.width,
+                  height: _controller!.value.size.height,
+                  child: VideoPlayer(_controller!),
+                ),
+              ),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildFailedState(VideoState videoState, {required bool canRetry}) =>
-      Align(
-        alignment: Alignment.topCenter,
-        child: AspectRatio(
-          aspectRatio: 1.0, // Force same square aspect ratio as videos
-          child: Container(
-            color: Colors.grey[900], // Use neutral color instead of red
-            child: Center(
+      Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: Colors.grey[900], // Use neutral color instead of red
+        child: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -928,77 +934,67 @@ class _VideoFeedItemState extends ConsumerState<VideoFeedItem>
                   ],
                 ],
               ),
-            ),
+        ),
+      );
+
+  Widget _buildDisposedState() => Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: Colors.grey[700],
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.delete_outline,
+                size: 64,
+                color: Colors.white54,
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Video disposed',
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontSize: 16,
+                ),
+              ),
+            ],
           ),
         ),
       );
 
-  Widget _buildDisposedState() => Align(
-        alignment: Alignment.topCenter,
-        child: AspectRatio(
-          aspectRatio: 1.0, // Force same square aspect ratio as videos
-          child: Container(
-            color: Colors.grey[700],
-            child: const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.delete_outline,
-                    size: 64,
-                    color: Colors.white54,
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'Video disposed',
-                    style: TextStyle(
-                      color: Colors.white54,
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
+  Widget _buildErrorState(String message) => Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: Colors.grey[900], // Use neutral color instead of red
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.videocam_off,
+                size: 64,
+                color: Colors.white54,
               ),
-            ),
-          ),
-        ),
-      );
-
-  Widget _buildErrorState(String message) => Align(
-        alignment: Alignment.topCenter,
-        child: AspectRatio(
-          aspectRatio: 1.0, // Force same square aspect ratio as videos
-          child: Container(
-            color: Colors.grey[900], // Use neutral color instead of red
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.videocam_off,
-                    size: 64,
-                    color: Colors.white54,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Video unavailable',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _getUserFriendlyErrorMessage(message),
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+              const SizedBox(height: 16),
+              const Text(
+                'Video unavailable',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
+              const SizedBox(height: 8),
+              Text(
+                _getUserFriendlyErrorMessage(message),
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
       );
