@@ -1,4 +1,4 @@
-// ABOUTME: P2P Video Sync Service for OpenVine - handles video metadata synchronization
+// ABOUTME: P2P Video Sync Service for divine - handles video metadata synchronization
 // ABOUTME: Simplified implementation using available embedded relay methods
 
 import 'dart:async';
@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_embedded_nostr_relay/flutter_embedded_nostr_relay.dart' as embedded;
 import 'package:openvine/services/p2p_discovery_service.dart';
 
-/// Simple P2P video sync service for OpenVine
+/// Simple P2P video sync service for divine
 /// Uses available embedded relay methods for video event synchronization
 class P2PVideoSyncService extends ChangeNotifier {
   final embedded.EmbeddedNostrRelay _embeddedRelay;
@@ -59,10 +59,10 @@ class P2PVideoSyncService extends ChangeNotifier {
       final peerId = connection.peer.id;
       final lastSync = _lastSyncTimes[peerId];
       
-      // Get recent video events (Kind 32222 for OpenVine videos)
+      // Get recent video events (Kind 32222 for divine videos)
       final since = lastSync ?? DateTime.now().subtract(const Duration(days: 7));
       final videoFilter = embedded.Filter(
-        kinds: [32222], // OpenVine video events
+        kinds: [32222], // divine video events
         since: since.millisecondsSinceEpoch ~/ 1000,
         limit: 100,
       );

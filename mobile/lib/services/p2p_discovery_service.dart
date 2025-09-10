@@ -1,4 +1,4 @@
-// ABOUTME: P2P Discovery Service for OpenVine video sharing between nearby devices
+// ABOUTME: P2P Discovery Service for divine video sharing between nearby devices
 // ABOUTME: Manages BLE discovery and WiFi Direct connections for local video sync
 
 import 'dart:async';
@@ -9,7 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_embedded_nostr_relay/flutter_embedded_nostr_relay.dart' as embedded;
 
-/// P2P Discovery Service for finding and connecting to nearby OpenVine users
+/// P2P Discovery Service for finding and connecting to nearby divine users
 class P2PDiscoveryService extends ChangeNotifier {
   final embedded.BleTransport _bleTransport = embedded.BleTransport();
   final embedded.WifiDirectTransport _wifiDirectTransport = embedded.WifiDirectTransport();
@@ -22,12 +22,12 @@ class P2PDiscoveryService extends ChangeNotifier {
   bool _isAdvertising = false;
   String? _deviceName;
   
-  // OpenVine-specific configuration
-  static const String appIdentifier = 'OpenVine';
+  // divine-specific configuration
+  static const String appIdentifier = 'divine';
   static const Duration discoveryTimeout = Duration(minutes: 5);
   static const Duration connectionTimeout = Duration(seconds: 30);
   
-  /// Stream of discovered nearby OpenVine users
+  /// Stream of discovered nearby divine users
   Stream<P2PPeer> get discoveredPeers => _peerController.stream;
   
   /// List of currently discovered peers
@@ -63,11 +63,11 @@ class P2PDiscoveryService extends ChangeNotifier {
     }
   }
   
-  /// Start discovering nearby OpenVine devices
+  /// Start discovering nearby divine devices
   Future<void> startDiscovery() async {
     if (_isDiscovering) return;
     
-    debugPrint('P2P: Starting discovery for nearby OpenVine devices');
+    debugPrint('P2P: Starting discovery for nearby divine devices');
     _isDiscovering = true;
     notifyListeners();
     
@@ -258,7 +258,7 @@ class P2PDiscoveryService extends ChangeNotifier {
   // Private methods
   
   void _onPeerDiscovered(embedded.TransportPeer transportPeer, P2PTransportType transportType) {
-    // Filter for OpenVine devices only
+    // Filter for divine devices only
     if (!transportPeer.name.contains(appIdentifier)) {
       return;
     }
@@ -281,7 +281,7 @@ class P2PDiscoveryService extends ChangeNotifier {
   }
   
   Future<String> _generateDeviceName() async {
-    // Generate a friendly device name for OpenVine
+    // Generate a friendly device name for divine
     final timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
     return '$appIdentifier-User-$timestamp';
   }

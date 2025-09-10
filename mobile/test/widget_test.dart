@@ -11,9 +11,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openvine/main.dart';
 
 void main() {
-  testWidgets('OpenVine app UI validation test', (tester) async {
+  testWidgets('divine app UI validation test', (tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const OpenVineApp());
+    await tester.pumpWidget(const DivineApp());
 
     // Give it one pump to start the initialization
     await tester.pump();

@@ -1,4 +1,4 @@
-// ABOUTME: Data model for OpenVine notifications with different types and metadata
+// ABOUTME: Data model for divine notifications with different types and metadata
 // ABOUTME: Supports likes, comments, follows, mentions, and system notifications
 
 import 'package:equatable/equatable.dart';

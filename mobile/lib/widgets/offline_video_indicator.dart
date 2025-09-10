@@ -2,6 +2,7 @@
 // ABOUTME: Visual indicator for cached/uncached videos and connectivity status
 
 import 'package:flutter/material.dart';
+import 'package:openvine/theme/vine_theme.dart';
 import 'package:openvine/services/offline_video_service.dart';
 
 /// Widget that displays the offline status of a video
@@ -71,7 +72,7 @@ class OfflineVideoIndicator extends StatelessWidget {
       case VideoOfflineStatus.fullyCached:
         return (
           Icons.offline_pin,
-          Colors.green,
+          VineTheme.vineGreen,
           'Cached'
         );
       case VideoOfflineStatus.metadataOnly:
@@ -112,7 +113,7 @@ class ConnectivityIndicator extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: isOnline
-                ? Colors.green.withValues(alpha: 0.1)
+                ? VineTheme.vineGreen.withValues(alpha: 0.1)
                 : Colors.orange.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
@@ -122,14 +123,14 @@ class ConnectivityIndicator extends StatelessWidget {
               Icon(
                 isOnline ? Icons.wifi : Icons.wifi_off,
                 size: 16,
-                color: isOnline ? Colors.green : Colors.orange,
+                color: isOnline ? VineTheme.vineGreen : Colors.orange,
               ),
               if (showLabel) ...[
                 const SizedBox(width: 4),
                 Text(
                   isOnline ? 'Online' : 'Offline',
                   style: TextStyle(
-                    color: isOnline ? Colors.green : Colors.orange,
+                    color: isOnline ? VineTheme.vineGreen : Colors.orange,
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -175,7 +176,7 @@ class VideoCacheStats extends StatelessWidget {
                   'Connection',
                   stats['is_online'] ? 'Online' : 'Offline',
                   stats['is_online'] ? Icons.wifi : Icons.wifi_off,
-                  stats['is_online'] ? Colors.green : Colors.orange,
+                  stats['is_online'] ? VineTheme.vineGreen : Colors.orange,
                 ),
                 _buildStatRow(
                   context,

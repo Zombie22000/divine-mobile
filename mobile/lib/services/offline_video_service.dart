@@ -1,4 +1,4 @@
-// ABOUTME: Offline Video Service for OpenVine - enables offline-first video browsing
+// ABOUTME: Offline Video Service for divine - enables offline-first video browsing
 // ABOUTME: Manages local video caching, smart preloading, and offline indicators
 
 import 'dart:async';
@@ -93,7 +93,7 @@ class OfflineVideoService extends ChangeNotifier {
     try {
       final filters = [
         embedded.Filter(
-          kinds: [32222], // OpenVine video events
+          kinds: [32222], // divine video events
           since: since != null ? since.millisecondsSinceEpoch ~/ 1000 : null,
           until: until != null ? until.millisecondsSinceEpoch ~/ 1000 : null,
           limit: limit ?? 50,

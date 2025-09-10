@@ -213,7 +213,7 @@ class _WebAuthScreenState extends ConsumerState<WebAuthScreen>
                                 ),
                                 const SizedBox(height: 24),
                                 const Text(
-                                  'Connect to OpenVine',
+                                  'Connect to divine',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 32,

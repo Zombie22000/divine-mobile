@@ -1,4 +1,4 @@
-// ABOUTME: Service for interacting with OpenVine Analytics API endpoints
+// ABOUTME: Service for interacting with divine Analytics API endpoints
 // ABOUTME: Handles trending videos, hashtags, creators, and metrics with viral scoring
 
 import 'dart:async';
@@ -146,7 +146,7 @@ class AnalyticsApiService {
         Uri.parse('$baseUrl/analytics/trending/vines?window=$timeWindow&limit=$limit'),
         headers: {
           'Accept': 'application/json',
-          'User-Agent': 'OpenVine-Mobile/1.0',
+          'User-Agent': 'divine-Mobile/1.0',
         },
       ).timeout(const Duration(seconds: 10));
 
@@ -227,7 +227,7 @@ class AnalyticsApiService {
         Uri.parse('$baseUrl/analytics/trending/hashtags?window=$timeWindow&limit=$limit'),
         headers: {
           'Accept': 'application/json',
-          'User-Agent': 'OpenVine-Mobile/1.0',
+          'User-Agent': 'divine-Mobile/1.0',
         },
       ).timeout(const Duration(seconds: 10));
 
@@ -289,7 +289,7 @@ class AnalyticsApiService {
         Uri.parse('$baseUrl/analytics/trending/creators?window=$timeWindow&limit=$limit'),
         headers: {
           'Accept': 'application/json',
-          'User-Agent': 'OpenVine-Mobile/1.0',
+          'User-Agent': 'divine-Mobile/1.0',
         },
       ).timeout(const Duration(seconds: 10));
 
@@ -341,7 +341,7 @@ class AnalyticsApiService {
         Uri.parse('$baseUrl/analytics/vines/$videoId/related?algorithm=$algorithm&limit=$limit'),
         headers: {
           'Accept': 'application/json',
-          'User-Agent': 'OpenVine-Mobile/1.0',
+          'User-Agent': 'divine-Mobile/1.0',
         },
       ).timeout(const Duration(seconds: 10));
 

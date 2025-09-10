@@ -2942,7 +2942,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                           title: const Text('Analytics',
                               style: TextStyle(color: Colors.white)),
                           subtitle: const Text(
-                              'Help improve OpenVine by sharing anonymous usage data',
+                              'Help improve divine by sharing anonymous usage data',
                               style: TextStyle(color: Colors.grey)),
                           trailing: Switch(
                             value: analyticsService.analyticsEnabled,
@@ -2953,7 +2953,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                   SnackBar(
                                     content: Text(
                                       value
-                                          ? 'Analytics enabled - Thank you for helping improve OpenVine!'
+                                          ? 'Analytics enabled - Thank you for helping improve divine!'
                                           : 'Analytics disabled - Your privacy is respected',
                                     ),
                                     backgroundColor:
@@ -3493,7 +3493,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       SnackBar(
         content: Text(kIsWeb 
           ? 'P2P Video Sync requires mobile app - not available on web'
-          : 'P2P Video Sync available! Connect to nearby OpenVine users.'),
+          : 'P2P Video Sync available! Connect to nearby divine users.'),
         backgroundColor: kIsWeb ? Colors.orange : Colors.blue,
         duration: const Duration(seconds: 3),
       ),

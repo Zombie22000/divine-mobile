@@ -1,5 +1,5 @@
 // ABOUTME: Analytics service for tracking video views with user opt-out support
-import 'package:flutter/foundation.dart';// ABOUTME: Sends anonymous view data to OpenVine analytics backend when enabled
+import 'package:flutter/foundation.dart';// ABOUTME: Sends anonymous view data to divine analytics backend when enabled
 
 import 'dart:async';
 import 'dart:convert';
@@ -213,7 +213,7 @@ class AnalyticsService  implements BackgroundAwareService {
             Uri.parse(_analyticsEndpoint),
             headers: {
               'Content-Type': 'application/json',
-              'User-Agent': 'OpenVine-Mobile/1.0',
+              'User-Agent': 'divine-Mobile/1.0',
             },
             body: jsonEncode(viewData),
           )

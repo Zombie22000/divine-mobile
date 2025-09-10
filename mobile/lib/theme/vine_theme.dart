@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 
 class VineTheme {
   // Classic Vine green color palette
-  static const Color vineGreen = Color(0xFF00BF63);
-  static const Color vineGreenDark = Color(0xFF00A855);
-  static const Color vineGreenLight = Color(0xFF4DD190);
+  static const Color vineGreen = Color(0xFF00B488);
+  static const Color vineGreenDark = Color(0xFF009A72);
+  static const Color vineGreenLight = Color(0xFF33C49F);
 
   // Background colors
   static const Color backgroundColor = Color(0xFF000000);

@@ -216,7 +216,7 @@ class VideoSharingService  {
       final hashtags = video.hashtags.map((tag) => '#$tag').join(' ');
       shareText += '\n\n$hashtags';
     }
-    shareText += '\n\nWatch on OpenVine: $url';
+    shareText += '\n\nWatch on divine: $url';
 
     return shareText;
   }
@@ -271,7 +271,7 @@ class VideoSharingService  {
     }
 
     buffer.writeln();
-    buffer.writeln('Shared via OpenVine 🍇');
+    buffer.writeln('Shared via divine 🍇');
 
     return buffer.toString();
   }

@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openvine/providers/app_providers.dart';
+import 'package:openvine/services/video_event_service.dart';
 import 'package:openvine/theme/vine_theme.dart';
 import 'package:openvine/utils/unified_logger.dart';
 
@@ -78,37 +79,67 @@ class _RelaySettingsScreenState extends ConsumerState<RelaySettingsScreen> {
                           'Add relays to sync your content',
                           style: TextStyle(color: Colors.grey[600], fontSize: 14),
                         ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: () => _retryConnection(),
+                          icon: const Icon(Icons.refresh, color: Colors.white),
+                          label: const Text('Retry Connection', style: TextStyle(color: Colors.white)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: VineTheme.vineGreen,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          ),
+                        ),
                       ],
                     ),
                   )
-                : ListView.builder(
-                    itemCount: externalRelays.length,
-                    itemBuilder: (context, index) {
-                      final relay = externalRelays[index];
-                      
-                      return ListTile(
-                        leading: Icon(
-                          Icons.cloud,
-                          color: Colors.green[400],
-                          size: 20,
-                        ),
-                        title: Text(
-                          relay,
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                        subtitle: Text(
-                          'External relay',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
+                : Column(
+                    children: [
+                      // Retry button at the top if relays exist but not connected
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        child: ElevatedButton.icon(
+                          onPressed: () => _retryConnection(),
+                          icon: const Icon(Icons.refresh, color: Colors.white),
+                          label: const Text('Retry Connection', style: TextStyle(color: Colors.white)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: VineTheme.vineGreen,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            minimumSize: const Size(double.infinity, 44),
                           ),
                         ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => _removeRelay(relay),
+                      ),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: externalRelays.length,
+                          itemBuilder: (context, index) {
+                            final relay = externalRelays[index];
+                            
+                            return ListTile(
+                              leading: Icon(
+                                Icons.cloud,
+                                color: Colors.green[400],
+                                size: 20,
+                              ),
+                              title: Text(
+                                relay,
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              subtitle: Text(
+                                'External relay',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                ),
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () => _removeRelay(relay),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
+                      ),
+                    ],
                   ),
           ),
         ],
@@ -296,5 +327,46 @@ class _RelaySettingsScreenState extends ConsumerState<RelaySettingsScreen> {
         backgroundColor: Colors.red[700],
       ),
     );
+  }
+  
+  Future<void> _retryConnection() async {
+    try {
+      final nostrService = ref.read(nostrServiceProvider);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Retrying relay connections...'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      
+      await nostrService.retryInitialization();
+      
+      // Check if any relays are now connected
+      final connectedCount = nostrService.connectedRelayCount;
+      
+      if (connectedCount > 0) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Connected to $connectedCount relay(s)!'),
+              backgroundColor: Colors.green[700],
+            ),
+          );
+        }
+        
+        // Trigger a refresh of video feeds
+        final videoService = ref.read(videoEventServiceProvider);
+        await videoService.subscribeToVideoFeed(
+          subscriptionType: SubscriptionType.discovery,
+          replace: true,
+        );
+      } else {
+        _showError('Failed to connect to relays. Please check your network connection.');
+      }
+    } catch (e) {
+      Log.error('Failed to retry connection: $e', name: 'RelaySettingsScreen');
+      _showError('Connection retry failed: ${e.toString()}');
+    }
   }
 }

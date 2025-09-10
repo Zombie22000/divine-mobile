@@ -863,7 +863,7 @@ class _ShareVideoMenuState extends ConsumerState<ShareVideoMenu> {
                 ),
               ],
             ),
-            backgroundColor: result.success ? Colors.green : Colors.red,
+            backgroundColor: result.success ? VineTheme.vineGreen : Colors.red,
           ),
         );
 
@@ -1959,7 +1959,7 @@ class _EditVideoDialogState extends ConsumerState<_EditVideoDialog> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Video updated successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: VineTheme.vineGreen,
           ),
         );
       }

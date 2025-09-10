@@ -295,7 +295,7 @@ class _VideoFeedScreenState extends ConsumerState<VideoFeedScreen>
         elevation: 0,
         automaticallyImplyLeading: false,
         title: Text(
-          'OpenVines',
+          'divine',
           style: GoogleFonts.pacifico(
             color: Colors.white,
             fontSize: 24,
@@ -373,7 +373,7 @@ class _VideoFeedScreenState extends ConsumerState<VideoFeedScreen>
         name: 'VideoFeedScreen', category: LogCategory.ui);
 
     if (!isFollowingAnyone) {
-      // Show educational message about OpenVine's non-algorithmic approach
+      // Show educational message about divine's non-algorithmic approach
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -397,7 +397,7 @@ class _VideoFeedScreenState extends ConsumerState<VideoFeedScreen>
               ),
               const SizedBox(height: 16),
               const Text(
-                'OpenVine doesn\'t give you an algorithmic feed.\nYou choose who you follow.',
+                'divine doesn\'t give you an algorithmic feed.\nYou choose who you follow.',
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 16,

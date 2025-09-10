@@ -6,7 +6,7 @@ part of 'profile_videos_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$profileVideosHash() => r'b1d3917f5395af9058bce8f3d247eb624b4d64b4';
+String _$profileVideosHash() => r'd3c61b9a1166dda1cacdc31fb51966b8cf9f566c';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -172,7 +172,7 @@ class _ProfileVideosProviderElement
 }
 
 String _$profileVideosNotifierHash() =>
-    r'7e2a6b0e87ef4179d08bf0275e860cc1a94eb5a6';
+    r'ad3c31731fc52e875469ac45ff6a9b3b999d452e';
 
 /// Notifier for managing profile videos state
 ///

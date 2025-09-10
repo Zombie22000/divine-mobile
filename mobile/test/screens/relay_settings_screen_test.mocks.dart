@@ -183,6 +183,7 @@ class MockNostrService extends _i1.Mock implements _i4.NostrService {
   _i5.Stream<_i7.Event> subscribeToEvents({
     required List<_i8.Filter>? filters,
     bool? bypassLimits = false,
+    void Function()? onEose,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -191,6 +192,7 @@ class MockNostrService extends _i1.Mock implements _i4.NostrService {
           {
             #filters: filters,
             #bypassLimits: bypassLimits,
+            #onEose: onEose,
           },
         ),
         returnValue: _i5.Stream<_i7.Event>.empty(),
@@ -252,6 +254,16 @@ class MockNostrService extends _i1.Mock implements _i4.NostrService {
         ),
         returnValue: _i5.Future<bool>.value(false),
       ) as _i5.Future<bool>);
+
+  @override
+  _i5.Future<void> retryInitialization() => (super.noSuchMethod(
+        Invocation.method(
+          #retryInitialization,
+          [],
+        ),
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
 
   @override
   _i5.Future<void> removeRelay(String? relayUrl) => (super.noSuchMethod(

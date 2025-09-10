@@ -34,6 +34,8 @@ SubscriptionManager videoEventsSubscriptionManager(
 @Riverpod(keepAlive: false)
 class VideoEvents extends _$VideoEvents {
   StreamController<List<VideoEvent>>? _controller;
+  Timer? _debounceTimer;
+  List<VideoEvent>? _pendingEvents;
   bool get _canEmit => _controller != null && !(_controller!.isClosed);
 
   @override
@@ -73,17 +75,25 @@ class VideoEvents extends _$VideoEvents {
     // Listen to VideoEventService changes reactively (proper Riverpod way)
     void onVideoEventServiceChange() {
       final newEvents = List<VideoEvent>.from(videoEventService.discoveryVideos);
-      Log.info(
-        '📺 VideoEvents: Reactive update - ${newEvents.length} discovery videos',
-        name: 'VideoEventsProvider',
-        category: LogCategory.video,
-      );
-      if (_canEmit) {
-        _controller!.add(newEvents);
-      } else {
-        // Controller was closed; detach listener to avoid Bad state errors
-        videoEventService.removeListener(onVideoEventServiceChange);
-      }
+      
+      // Store pending events for debounced emission
+      _pendingEvents = newEvents;
+      
+      // Cancel any existing timer
+      _debounceTimer?.cancel();
+      
+      // Create a new debounce timer to batch updates
+      _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+        if (_pendingEvents != null && _canEmit) {
+          Log.info(
+            '📺 VideoEvents: Batched update - ${_pendingEvents!.length} discovery videos',
+            name: 'VideoEventsProvider',
+            category: LogCategory.video,
+          );
+          _controller!.add(_pendingEvents!);
+          _pendingEvents = null;
+        }
+      });
     }
     
     // Add listener for reactive updates
@@ -91,6 +101,7 @@ class VideoEvents extends _$VideoEvents {
 
     // Clean up on dispose
     ref.onDispose(() {
+      _debounceTimer?.cancel();
       videoEventService.removeListener(onVideoEventServiceChange);
       // Close and null out the controller to signal no further emits
       _controller?.close();
@@ -112,6 +123,12 @@ class VideoEvents extends _$VideoEvents {
       return;
     }
     final videoEventService = ref.read(videoEventServiceProvider);
+    // Avoid noisy re-requests if already subscribed
+    if (videoEventService.isSubscribed(SubscriptionType.discovery)) {
+      Log.debug('VideoEvents: Discovery already active; skipping start',
+          name: 'VideoEventsProvider', category: LogCategory.video);
+      return;
+    }
     
     Log.info(
       'VideoEvents: Starting discovery subscription on demand',

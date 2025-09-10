@@ -1,7 +1,8 @@
 // ABOUTME: P2P Sync Screen for managing peer-to-peer video sharing
-// ABOUTME: User interface for discovering, connecting to, and syncing with nearby OpenVine devices
+// ABOUTME: User interface for discovering, connecting to, and syncing with nearby divine devices
 
 import 'package:flutter/material.dart';
+import 'package:openvine/theme/vine_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openvine/providers/p2p_sync_provider.dart';
 import 'package:openvine/services/p2p_discovery_service.dart';
@@ -234,7 +235,7 @@ class _P2PSyncScreenState extends ConsumerState<P2PSyncScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Nearby OpenVine Users',
+            'Nearby divine Users',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 12),
@@ -266,12 +267,12 @@ class _P2PSyncScreenState extends ConsumerState<P2PSyncScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'No OpenVine users nearby',
+            'No divine users nearby',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           Text(
-            'Start discovery to find other OpenVine users\nwho are sharing videos nearby.',
+            'Start discovery to find other divine users\nwho are sharing videos nearby.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -307,7 +308,7 @@ class _P2PSyncScreenState extends ConsumerState<P2PSyncScreen> {
     
     final transportColor = peer.transportType == P2PTransportType.ble
         ? Colors.blue
-        : Colors.green;
+        : VineTheme.vineGreen;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),

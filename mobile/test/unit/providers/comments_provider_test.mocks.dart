@@ -736,6 +736,7 @@ class MockINostrService extends _i1.Mock implements _i4.INostrService {
   _i6.Stream<_i7.Event> subscribeToEvents({
     required List<_i10.Filter>? filters,
     bool? bypassLimits = false,
+    void Function()? onEose,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -744,6 +745,7 @@ class MockINostrService extends _i1.Mock implements _i4.INostrService {
           {
             #filters: filters,
             #bypassLimits: bypassLimits,
+            #onEose: onEose,
           },
         ),
         returnValue: _i6.Stream<_i7.Event>.empty(),
@@ -829,6 +831,16 @@ class MockINostrService extends _i1.Mock implements _i4.INostrService {
   _i6.Future<void> reconnectAll() => (super.noSuchMethod(
         Invocation.method(
           #reconnectAll,
+          [],
+        ),
+        returnValue: _i6.Future<void>.value(),
+        returnValueForMissingStub: _i6.Future<void>.value(),
+      ) as _i6.Future<void>);
+
+  @override
+  _i6.Future<void> retryInitialization() => (super.noSuchMethod(
+        Invocation.method(
+          #retryInitialization,
           [],
         ),
         returnValue: _i6.Future<void>.value(),

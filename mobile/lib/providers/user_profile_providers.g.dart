@@ -170,7 +170,7 @@ class _UserProfileProviderElement
 }
 
 String _$userProfileNotifierHash() =>
-    r'0806c848455028ab63a13a46bdc45efb22921750';
+    r'c505237a297eeb1910934ef3b3fdcd8c1fc4db6e';
 
 /// See also [UserProfileNotifier].
 @ProviderFor(UserProfileNotifier)

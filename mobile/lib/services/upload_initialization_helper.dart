@@ -1,0 +1,299 @@
+// ABOUTME: Robust initialization helper with retry logic and failure recovery
+// ABOUTME: Handles transient failures, corrupted storage, and provides exponential backoff
+
+import 'dart:async';
+import 'dart:math';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:openvine/models/pending_upload.dart';
+import 'package:openvine/utils/unified_logger.dart';
+
+/// Robust initialization helper for UploadManager
+class UploadInitializationHelper {
+  static const String _uploadsBoxName = 'pending_uploads';
+  static const int _maxRetries = 5;
+  static const Duration _baseDelay = Duration(milliseconds: 500);
+  static const Duration _maxDelay = Duration(seconds: 30);
+  
+  // Track initialization state
+  static bool _isInitializing = false;
+  static int _failureCount = 0;
+  static DateTime? _lastFailureTime;
+  static Box<PendingUpload>? _cachedBox;
+  
+  /// Robustly initialize the uploads box with retry logic
+  static Future<Box<PendingUpload>> initializeUploadsBox({
+    bool forceReinit = false,
+  }) async {
+    // Return cached box if available and not forcing reinit
+    if (_cachedBox != null && _cachedBox!.isOpen && !forceReinit) {
+      Log.debug('Using cached uploads box',
+          name: 'UploadInitHelper', category: LogCategory.video);
+      return _cachedBox!;
+    }
+    
+    // Prevent concurrent initialization attempts
+    if (_isInitializing) {
+      Log.info('Waiting for ongoing initialization...',
+          name: 'UploadInitHelper', category: LogCategory.video);
+      return _waitForInitialization();
+    }
+    
+    _isInitializing = true;
+    
+    try {
+      // Check if we should apply circuit breaker
+      if (_shouldApplyCircuitBreaker()) {
+        throw Exception('Circuit breaker active - too many recent failures');
+      }
+      
+      // Attempt initialization with retries
+      final box = await _initializeWithRetries();
+      
+      // Success - reset failure tracking
+      _failureCount = 0;
+      _lastFailureTime = null;
+      _cachedBox = box;
+      
+      Log.info('✅ Uploads box initialized successfully',
+          name: 'UploadInitHelper', category: LogCategory.video);
+      
+      return box;
+      
+    } catch (e) {
+      _failureCount++;
+      _lastFailureTime = DateTime.now();
+      
+      Log.error('❌ Failed to initialize uploads box after all retries: $e',
+          name: 'UploadInitHelper', category: LogCategory.video);
+      
+      // Try recovery strategies
+      final recoveredBox = await _attemptRecovery();
+      if (recoveredBox != null) {
+        _cachedBox = recoveredBox;
+        return recoveredBox;
+      }
+      
+      rethrow;
+    } finally {
+      _isInitializing = false;
+    }
+  }
+  
+  /// Initialize with exponential backoff retry
+  static Future<Box<PendingUpload>> _initializeWithRetries() async {
+    Exception? lastError;
+    
+    for (int attempt = 0; attempt <= _maxRetries; attempt++) {
+      try {
+        Log.info('Initialization attempt ${attempt + 1}/$_maxRetries',
+            name: 'UploadInitHelper', category: LogCategory.video);
+        
+        // Register adapters if needed
+        if (!Hive.isAdapterRegistered(1)) {
+          Hive.registerAdapter(UploadStatusAdapter());
+        }
+        if (!Hive.isAdapterRegistered(2)) {
+          Hive.registerAdapter(PendingUploadAdapter());
+        }
+        
+        // Try to open the box
+        Box<PendingUpload>? box;
+        
+        // First try: normal open
+        try {
+          box = await Hive.openBox<PendingUpload>(_uploadsBoxName)
+              .timeout(const Duration(seconds: 10));
+        } catch (e) {
+          Log.warning('Normal open failed: $e, trying recovery...',
+              name: 'UploadInitHelper', category: LogCategory.video);
+          
+          // Second try: delete and recreate if corrupted
+          if (e.toString().contains('corrupted') || 
+              e.toString().contains('Invalid') ||
+              e.toString().contains('format')) {
+            await _deleteCorruptedBox();
+            box = await Hive.openBox<PendingUpload>(_uploadsBoxName);
+          } else {
+            rethrow;
+          }
+        }
+        
+        if (box == null || !box.isOpen) {
+          throw Exception('Box opened but is null or not open');
+        }
+        
+        // Verify box is functional
+        await _verifyBoxFunctionality(box);
+        
+        return box;
+        
+      } catch (e) {
+        lastError = e as Exception;
+        
+        if (attempt < _maxRetries) {
+          final delay = _calculateBackoffDelay(attempt);
+          Log.warning(
+            'Attempt ${attempt + 1} failed: $e. Retrying in ${delay.inMilliseconds}ms...',
+            name: 'UploadInitHelper',
+            category: LogCategory.video,
+          );
+          await Future.delayed(delay);
+        }
+      }
+    }
+    
+    throw lastError ?? Exception('Failed to initialize after $_maxRetries attempts');
+  }
+  
+  /// Calculate exponential backoff delay
+  static Duration _calculateBackoffDelay(int attempt) {
+    final exponentialDelay = _baseDelay * pow(2, attempt);
+    final jitteredDelay = exponentialDelay * (0.5 + Random().nextDouble() * 0.5);
+    
+    return jitteredDelay < _maxDelay ? jitteredDelay : _maxDelay;
+  }
+  
+  /// Check if circuit breaker should be applied
+  static bool _shouldApplyCircuitBreaker() {
+    if (_failureCount < 10) return false;
+    if (_lastFailureTime == null) return false;
+    
+    // Apply circuit breaker for 5 minutes after 10 failures
+    final timeSinceLastFailure = DateTime.now().difference(_lastFailureTime!);
+    return timeSinceLastFailure.inMinutes < 5;
+  }
+  
+  /// Wait for ongoing initialization
+  static Future<Box<PendingUpload>> _waitForInitialization() async {
+    const maxWait = Duration(seconds: 30);
+    const checkInterval = Duration(milliseconds: 100);
+    final startTime = DateTime.now();
+    
+    while (_isInitializing) {
+      if (DateTime.now().difference(startTime) > maxWait) {
+        throw TimeoutException('Initialization timeout after 30 seconds');
+      }
+      
+      await Future.delayed(checkInterval);
+      
+      // Check if initialization completed successfully
+      if (_cachedBox != null && _cachedBox!.isOpen) {
+        return _cachedBox!;
+      }
+    }
+    
+    // If we get here, initialization completed but failed
+    throw Exception('Initialization completed but box not available');
+  }
+  
+  /// Attempt recovery strategies
+  static Future<Box<PendingUpload>?> _attemptRecovery() async {
+    Log.warning('Attempting recovery strategies...',
+        name: 'UploadInitHelper', category: LogCategory.video);
+    
+    // Strategy 1: Try to use existing box if it's somehow still open
+    try {
+      if (Hive.isBoxOpen(_uploadsBoxName)) {
+        final box = Hive.box<PendingUpload>(_uploadsBoxName);
+        if (await _verifyBoxFunctionality(box)) {
+          Log.info('Recovery successful - using existing open box',
+              name: 'UploadInitHelper', category: LogCategory.video);
+          return box;
+        }
+      }
+    } catch (e) {
+      Log.debug('Existing box recovery failed: $e',
+          name: 'UploadInitHelper', category: LogCategory.video);
+    }
+    
+    // Strategy 2: Delete corrupted box and start fresh
+    try {
+      await _deleteCorruptedBox();
+      final box = await Hive.openBox<PendingUpload>(_uploadsBoxName);
+      
+      if (await _verifyBoxFunctionality(box)) {
+        Log.info('Recovery successful - created fresh box',
+            name: 'UploadInitHelper', category: LogCategory.video);
+        return box;
+      }
+    } catch (e) {
+      Log.error('Fresh box recovery failed: $e',
+          name: 'UploadInitHelper', category: LogCategory.video);
+    }
+    
+    // Strategy 3: Use in-memory box as last resort
+    try {
+      Log.warning('Using in-memory box as last resort',
+          name: 'UploadInitHelper', category: LogCategory.video);
+      
+      // Note: This would need a custom in-memory box implementation
+      // For now, we'll return null to indicate failure
+      return null;
+    } catch (e) {
+      Log.error('In-memory box creation failed: $e',
+          name: 'UploadInitHelper', category: LogCategory.video);
+    }
+    
+    return null;
+  }
+  
+  /// Delete corrupted box files
+  static Future<void> _deleteCorruptedBox() async {
+    try {
+      await Hive.deleteBoxFromDisk(_uploadsBoxName);
+      Log.warning('Deleted corrupted uploads box',
+          name: 'UploadInitHelper', category: LogCategory.video);
+    } catch (e) {
+      Log.error('Failed to delete corrupted box: $e',
+          name: 'UploadInitHelper', category: LogCategory.video);
+    }
+  }
+  
+  /// Verify box is functional
+  static Future<bool> _verifyBoxFunctionality(Box<PendingUpload> box) async {
+    try {
+      // Try to read length
+      final length = box.length;
+      
+      // Try to read all keys
+      final keys = box.keys.toList();
+      
+      // Try a write/read/delete operation with a test key
+      const testKey = '__test_functionality__';
+      final testUpload = PendingUpload.create(
+        localVideoPath: '/test/path',
+        nostrPubkey: 'test_pubkey',
+      );
+      
+      await box.put(testKey, testUpload);
+      final retrieved = box.get(testKey);
+      await box.delete(testKey);
+      
+      return retrieved != null;
+    } catch (e) {
+      Log.error('Box functionality verification failed: $e',
+          name: 'UploadInitHelper', category: LogCategory.video);
+      return false;
+    }
+  }
+  
+  /// Reset all state (useful for testing)
+  static void reset() {
+    _isInitializing = false;
+    _failureCount = 0;
+    _lastFailureTime = null;
+    _cachedBox = null;
+  }
+  
+  /// Get current state for debugging
+  static Map<String, dynamic> getDebugState() {
+    return {
+      'isInitializing': _isInitializing,
+      'failureCount': _failureCount,
+      'lastFailureTime': _lastFailureTime?.toIso8601String(),
+      'hasCachedBox': _cachedBox != null,
+      'cachedBoxOpen': _cachedBox?.isOpen ?? false,
+      'circuitBreakerActive': _shouldApplyCircuitBreaker(),
+    };
+  }
+}

@@ -148,6 +148,11 @@ class UserProfileNotifier extends _$UserProfileNotifier {
 
   @override
   UserProfileState build() {
+    // Keep this provider alive to avoid repeated init/dispose thrash when accessed via ref.read
+    // (AutoDispose is default for @riverpod; keep it alive explicitly.)
+    // This prevents log spam like "User profile notifier initialized" on every rebuild.
+    // ignore: unused_local_variable
+    final keepAliveLink = ref.keepAlive();
     ref.onDispose(() {
       _cleanupAllSubscriptions();
       _batchDebounceTimer?.cancel();
@@ -277,10 +282,13 @@ class UserProfileNotifier extends _$UserProfileNotifier {
     final isExploreActive = ref.read(isExploreTabActiveProvider);
     final isProfileActive = ref.read(isProfileTabActiveProvider);
     if (!(isFeedActive || isExploreActive || isProfileActive)) {
-      Log.debug('Prefetch suppressed: no active video/profile tab',
+      Log.info('🚫 Prefetch suppressed: Feed=$isFeedActive, Explore=$isExploreActive, Profile=$isProfileActive',
           name: 'UserProfileNotifier', category: LogCategory.system);
       return;
     }
+    
+    Log.info('✅ Prefetch allowed: Feed=$isFeedActive, Explore=$isExploreActive, Profile=$isProfileActive',
+        name: 'UserProfileNotifier', category: LogCategory.system);
 
     if (!state.isInitialized) {
       await initialize();

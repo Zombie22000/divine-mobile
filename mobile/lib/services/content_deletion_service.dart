@@ -287,7 +287,7 @@ class ContentDeletionService  {
     }
 
     buffer.writeln(
-        'Content deleted by author via OpenVine for Apple App Store compliance');
+        'Content deleted by author via divine for Apple App Store compliance');
     return buffer.toString();
   }
 

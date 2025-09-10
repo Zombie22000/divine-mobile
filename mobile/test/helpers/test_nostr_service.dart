@@ -152,8 +152,11 @@ class TestNostrService implements INostrService {
   }
 
   @override
-  Stream<Event> subscribeToEvents(
-      {required List<Filter> filters, bool bypassLimits = false}) {
+  Stream<Event> subscribeToEvents({
+    required List<Filter> filters,
+    bool bypassLimits = false,
+    void Function()? onEose,
+  }) {
     final subscriptionId = 'test_sub_${DateTime.now().millisecondsSinceEpoch}';
     
     if (_subscriptions.containsKey(subscriptionId)) {
@@ -274,6 +277,10 @@ class TestNostrService implements INostrService {
   }
 
   @override
+  Future<void> retryInitialization() async {
+    _isConnected = true;
+  }
+
   Future<void> dispose() async {
     _isConnected = false;
     for (final controller in _subscriptions.values) {

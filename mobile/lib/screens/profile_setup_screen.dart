@@ -140,7 +140,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                     children: [
                       Text(
                         widget.isNewUser
-                            ? 'Welcome to OpenVine!'
+                            ? 'Welcome to divine!'
                             : 'Update Your Profile',
                         style: const TextStyle(
                           fontSize: 28,
@@ -633,7 +633,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                               ),
                               const SizedBox(height: 12),
                               Text(
-                                'OpenVine uses Nostr, a decentralized protocol where YOU own your identity and data. Unlike centralized platforms, no single company controls your account.',
+                                'divine uses Nostr, a decentralized protocol where YOU own your identity and data. Unlike centralized platforms, no single company controls your account.',
                                 style: TextStyle(
                                   color: Colors.grey[300],
                                   fontSize: 13,

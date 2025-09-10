@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:openvine/models/notification_model.dart';
 import 'package:openvine/theme/app_theme.dart';
+import 'package:openvine/theme/vine_theme.dart';
 
 class NotificationListItem extends StatelessWidget {
   const NotificationListItem({
@@ -144,13 +145,13 @@ class NotificationListItem extends StatelessWidget {
         width: 48,
         height: 48,
         decoration: BoxDecoration(
-          color: OpenVineTheme.primaryPurple.withValues(alpha: 0.2),
+          color: DivineTheme.primaryPurple.withValues(alpha: 0.2),
           shape: BoxShape.circle,
         ),
         child: const Center(
           child: Icon(
             Icons.person,
-            color: OpenVineTheme.primaryPurple,
+            color: DivineTheme.primaryPurple,
             size: 24,
           ),
         ),
@@ -263,11 +264,11 @@ class NotificationListItem extends StatelessWidget {
       case NotificationType.comment:
         return Colors.blue;
       case NotificationType.follow:
-        return OpenVineTheme.primaryPurple;
+        return DivineTheme.primaryPurple;
       case NotificationType.mention:
         return Colors.orange;
       case NotificationType.repost:
-        return Colors.green;
+        return VineTheme.vineGreen;
       case NotificationType.system:
         return Colors.grey;
     }

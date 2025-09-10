@@ -54,6 +54,13 @@ class NostrService implements INostrService {
     
     Log.info('Starting initialization with embedded relay', name: 'NostrService', category: LogCategory.relay);
     
+    // Ensure default relay is always included
+    final defaultRelay = 'wss://relay3.openvine.co';
+    final relaysToAdd = customRelays ?? [defaultRelay];
+    if (!relaysToAdd.contains(defaultRelay)) {
+      relaysToAdd.add(defaultRelay);
+    }
+    
     try {
       // Initialize embedded relay (use injected instance if provided)
       _embeddedRelay ??= embedded.EmbeddedNostrRelay();
@@ -63,9 +70,6 @@ class NostrService implements INostrService {
       Log.info('Embedded relay initialized', name: 'NostrService', category: LogCategory.relay);
       
       // Add external relays (embedded relay will manage connections)
-      final defaultRelay = 'wss://relay3.openvine.co';
-      final relaysToAdd = customRelays ?? [defaultRelay];
-      
       for (final relayUrl in relaysToAdd) {
         try {
           await _embeddedRelay!.addExternalRelay(relayUrl);
@@ -90,8 +94,21 @@ class NostrService implements INostrService {
       Log.info('Initialization complete with ${_configuredRelays.length} external relays', name: 'NostrService', category: LogCategory.relay);
       
     } catch (e) {
-      Log.error('Failed to initialize: $e', name: 'NostrService', category: LogCategory.relay);
-      throw StateError('Failed to initialize embedded relay: $e');
+      Log.error('Embedded relay initialization failed, attempting fallback: $e', name: 'NostrService', category: LogCategory.relay);
+      
+      // FALLBACK: Ensure at least the default relay is in the configured list
+      // even if embedded relay fails, so UI shows the relay and retry is possible
+      if (!_configuredRelays.contains(defaultRelay)) {
+        _configuredRelays.add(defaultRelay);
+        Log.info('Added default relay to configured list for retry capability', name: 'NostrService', category: LogCategory.relay);
+      }
+      
+      // Mark as partially initialized to allow app to continue
+      _isInitialized = true;
+      
+      // Don't throw error - let app continue with limited functionality
+      Log.warning('NostrService initialized with limited functionality - relay connections may need manual retry', 
+                  name: 'NostrService', category: LogCategory.relay);
     }
   }
 
@@ -368,18 +385,78 @@ class NostrService implements INostrService {
       return false; // Already added
     }
     
-    if (_embeddedRelay == null) {
-      throw StateError('Embedded relay not initialized');
+    // Add to configured list even if embedded relay isn't ready
+    _configuredRelays.add(relayUrl);
+    UnifiedLogger.info('Added relay to configuration: $relayUrl', name: 'NostrService');
+    
+    // Try to connect if embedded relay is available
+    if (_embeddedRelay != null) {
+      try {
+        await _embeddedRelay!.addExternalRelay(relayUrl);
+        UnifiedLogger.info('Connected to relay: $relayUrl', name: 'NostrService');
+        
+        // Notify auth state listeners
+        _relayAuthStates[relayUrl] = true;
+        _authStateController.add(Map.from(_relayAuthStates));
+        
+        return true;
+      } catch (e) {
+        UnifiedLogger.error('Failed to connect relay (will retry): $e', name: 'NostrService');
+      }
+    } else {
+      // Try to initialize embedded relay again
+      await retryInitialization();
     }
     
+    return true; // Added to config even if not connected yet
+  }
+  
+  /// Retry initialization of embedded relay and reconnect configured relays
+  @override
+  Future<void> retryInitialization() async {
+    if (_embeddedRelay != null) {
+      UnifiedLogger.info('Embedded relay already exists', name: 'NostrService');
+      
+      // Try to reconnect configured relays
+      for (final relayUrl in _configuredRelays) {
+        try {
+          await _embeddedRelay!.addExternalRelay(relayUrl);
+          _relayAuthStates[relayUrl] = true;
+          UnifiedLogger.info('Reconnected to relay: $relayUrl', name: 'NostrService');
+        } catch (e) {
+          UnifiedLogger.error('Failed to reconnect relay $relayUrl: $e', name: 'NostrService');
+        }
+      }
+      _authStateController.add(Map.from(_relayAuthStates));
+      return;
+    }
+    
+    UnifiedLogger.info('Retrying embedded relay initialization...', name: 'NostrService');
+    
     try {
-      await _embeddedRelay!.addExternalRelay(relayUrl);
-      _configuredRelays.add(relayUrl);
-      UnifiedLogger.info('Added external relay: $relayUrl', name: 'NostrService');
-      return true;
+      // Try to initialize embedded relay again
+      _embeddedRelay = embedded.EmbeddedNostrRelay();
+      await _embeddedRelay!.initialize(
+        enableGarbageCollection: true,
+      );
+      UnifiedLogger.info('Embedded relay initialized on retry', name: 'NostrService');
+      
+      // Reconnect all configured relays
+      for (final relayUrl in _configuredRelays) {
+        try {
+          await _embeddedRelay!.addExternalRelay(relayUrl);
+          _relayAuthStates[relayUrl] = true;
+          UnifiedLogger.info('Reconnected to relay: $relayUrl', name: 'NostrService');
+        } catch (e) {
+          UnifiedLogger.error('Failed to reconnect relay $relayUrl: $e', name: 'NostrService');
+        }
+      }
+      
+      // Notify auth state listeners
+      _authStateController.add(Map.from(_relayAuthStates));
+      
     } catch (e) {
-      UnifiedLogger.error('Failed to add relay $relayUrl: $e', name: 'NostrService');
-      return false;
+      UnifiedLogger.error('Embedded relay retry failed: $e', name: 'NostrService');
     }
   }
 
@@ -523,7 +600,7 @@ class NostrService implements INostrService {
   
   // P2P Sync Methods
   
-  /// Start P2P discovery for nearby OpenVine devices
+  /// Start P2P discovery for nearby divine devices
   Future<bool> startP2PDiscovery() async {
     if (!_p2pEnabled) return false;
     

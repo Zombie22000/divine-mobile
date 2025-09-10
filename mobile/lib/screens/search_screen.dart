@@ -1,4 +1,4 @@
-// ABOUTME: Search screen for finding videos, users, and hashtags in the OpenVine network
+// ABOUTME: Search screen for finding videos, users, and hashtags in the divine network
 // ABOUTME: Provides real-time search functionality with filters and categories
 
 import 'dart:async';
@@ -355,7 +355,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
             ),
             SizedBox(height: 16),
             Text(
-              'Search OpenVine',
+              'Search divine',
               style: TextStyle(
                 color: VineTheme.primaryText,
                 fontSize: 18,

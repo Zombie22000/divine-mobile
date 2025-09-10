@@ -438,7 +438,7 @@ class MuteService {
 
       final event = await _authService.createAndSignEvent(
         kind: 10000, // NIP-51 mute list
-        content: 'OpenVine mute list',
+        content: 'divine mute list',
         tags: tags,
       );
 

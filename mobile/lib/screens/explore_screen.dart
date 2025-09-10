@@ -64,6 +64,9 @@ class ExploreScreenState extends ConsumerState<ExploreScreen>
   
   // Track hashtag video loading
   int? _oldestHashtagVideoTimestamp;
+  
+  // One-time guard to avoid repeatedly starting discovery from Trending grid builds
+  bool _discoveryStartedForHashtags = false;
 
   @override
   void initState() {
@@ -101,6 +104,9 @@ class ExploreScreenState extends ConsumerState<ExploreScreen>
     Log.info('📱 ExploreScreen became visible',
         name: 'ExploreScreen', category: LogCategory.ui);
     _isScreenVisible = true;
+    
+    // Ensure tab visibility is set to Explore (index 2)
+    ref.read(tabVisibilityProvider.notifier).setActiveTab(2);
     
     // If user is on trending tab and we haven't fetched yet, fetch now
     if (_tabController.index == 2 && !_hasFetchedTrending) {
@@ -229,7 +235,6 @@ class ExploreScreenState extends ConsumerState<ExploreScreen>
 
   /// Handle video tap to enter feed mode
   void _enterFeedMode(List<VideoEvent> videos, int startIndex) {
-    debugPrint('🎬 _enterFeedMode called for video ${videos[startIndex].id.substring(0, 8)} at index $startIndex');
     Log.debug('🎬 Entering feed mode for video ${videos[startIndex].id} at index $startIndex', 
         name: 'ExploreScreen', category: LogCategory.ui);
     
@@ -255,30 +260,18 @@ class ExploreScreenState extends ConsumerState<ExploreScreen>
       }
     }
     
-    // Now preload the current video and surrounding videos in VideoManager
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final videoManager = ref.read(videoManagerProvider.notifier);
-      
-      // Preload current video first (priority)
-      videoManager.preloadVideo(videos[startIndex].id);
-      
-      // Preload surrounding videos for smooth scrolling
-      for (int i = -2; i <= 2; i++) {
-        final index = startIndex + i;
-        if (index >= 0 && index < videos.length && index != startIndex) {
-          videoManager.preloadVideo(videos[index].id);
-        }
-      }
-      
-      Log.debug('🚀 Preloaded ${videos[startIndex].id.substring(0, 8)} and surrounding videos for feed mode',
-          name: 'ExploreScreen', category: LogCategory.ui);
-    });
+    // DO NOT preload here - let VideoFeedItem handle preloading when it's rendered
+    // This avoids timing issues where we try to preload before videos are properly added
+    Log.debug('🚀 Added ${videos.length} videos to VideoManager for feed mode',
+        name: 'ExploreScreen', category: LogCategory.ui);
     
     // Batch fetch profiles for visible videos
-    _batchFetchProfilesAroundIndex(startIndex, videos);
+    // Add a small delay to ensure tab visibility is properly set
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _batchFetchProfilesAroundIndex(startIndex, videos);
+    });
     
     setState(() {
-      debugPrint('📱 Setting state: _isInFeedMode = true, _currentVideoIndex = $startIndex');
       _isInFeedMode = true;
       _currentTabVideos = videos;
       _currentVideoIndex = startIndex;
@@ -1162,10 +1155,8 @@ class ExploreScreenState extends ConsumerState<ExploreScreen>
   }
 
   Widget _buildPopularNowContent(List<VideoEvent> videos, List<VideoEvent> allVideos) {
-    debugPrint('🏗️ _buildPopularNowContent: _isInFeedMode = $_isInFeedMode, videos.length = ${videos.length}');
     // Check if we should show feed mode or grid mode
     if (_isInFeedMode) {
-      debugPrint('📱 Building feed mode with ${_currentTabVideos.length} videos, currentIndex = $_currentVideoIndex');
       // Full-screen video feed mode
       return PageView.builder(
         scrollDirection: Axis.vertical,
@@ -1201,7 +1192,6 @@ class ExploreScreenState extends ConsumerState<ExploreScreen>
         },
       );
     } else {
-      debugPrint('📱 Building grid mode');
       // Grid view mode with pull-to-refresh
       final screenWidth = MediaQuery.of(context).size.width;
       final crossAxisCount = screenWidth < 600
@@ -1268,7 +1258,6 @@ class ExploreScreenState extends ConsumerState<ExploreScreen>
                         isActive: false, // Never active in grid - feed mode handles playback
                         showTextOverlay: false, // Popular Now shows clean thumbnails without text
                         onTap: () {
-                          debugPrint('🎬 Tapping video ${video.id.substring(0, 8)} with URL: ${video.videoUrl}');
                           _enterFeedMode(videos, index);
                         },
                         onClose: _exitFeedMode,
@@ -1342,7 +1331,6 @@ class ExploreScreenState extends ConsumerState<ExploreScreen>
     if (_selectedHashtag != null) {
       // Get videos after watching video events to ensure we have latest data
       final videos = hashtagService.getVideosByHashtags([_selectedHashtag!]);
-      debugPrint('🏷️ Building trending with hashtag #$_selectedHashtag: ${videos.length} videos');
       
       return Column(
         children: [
@@ -1681,7 +1669,9 @@ class ExploreScreenState extends ConsumerState<ExploreScreen>
       
       // Also trigger discovery subscription to get more videos from relays
       // This will populate hashtag statistics with fresh data
-      if (isExploreActive) {
+      // Guard to once to avoid repeated requests on every rebuild.
+      if (isExploreActive && !_discoveryStartedForHashtags) {
+        _discoveryStartedForHashtags = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           // Check relay connectivity status first
           final nostrService = ref.read(nostrServiceProvider);
@@ -1941,7 +1931,6 @@ class ExploreScreenState extends ConsumerState<ExploreScreen>
 
     // Check if we should show feed mode or grid mode
     if (_isInFeedMode) {
-          debugPrint('📱 Building trending feed mode with ${_currentTabVideos.length} videos, currentIndex = $_currentVideoIndex');
           // Full-screen video feed mode
           return PageView.builder(
             scrollDirection: Axis.vertical,
@@ -1977,7 +1966,6 @@ class ExploreScreenState extends ConsumerState<ExploreScreen>
             },
           );
         } else {
-          debugPrint('📱 Building trending grid mode');
           // Grid view mode with pull-to-refresh
           final screenWidth = MediaQuery.of(context).size.width;
           final crossAxisCount = screenWidth < 600
@@ -2036,7 +2024,6 @@ class ExploreScreenState extends ConsumerState<ExploreScreen>
                             video: video,
                             isActive: false,
                             onTap: () {
-                              debugPrint('🎬 Tapping trending video ${video.id.substring(0, 8)} with URL: ${video.videoUrl}');
                               _enterFeedMode(videos, index);
                             },
                             onClose: _exitFeedMode,

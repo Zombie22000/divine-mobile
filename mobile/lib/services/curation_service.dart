@@ -258,7 +258,7 @@ class CurationService  {
         Uri.parse('https://api.openvine.co/analytics/trending/vines'),
         headers: {
           'Accept': 'application/json',
-          'User-Agent': 'OpenVine-Mobile/1.0',
+          'User-Agent': 'divine-Mobile/1.0',
         },
       ).timeout(const Duration(seconds: 10));
 

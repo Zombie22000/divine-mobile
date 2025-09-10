@@ -1,9 +1,9 @@
-// ABOUTME: OpenVine application theme with purple accent colors
+// ABOUTME: divine application theme with purple accent colors
 // ABOUTME: Defines color scheme and styling for the notification system
 
 import 'package:flutter/material.dart';
 
-class OpenVineTheme {
+class DivineTheme {
   // Primary colors
   static const Color primaryPurple = Color(0xFF8B5CF6);
   static const Color primaryPurpleDark = Color(0xFF7C3AED);

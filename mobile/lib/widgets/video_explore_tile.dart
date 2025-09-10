@@ -49,11 +49,6 @@ class VideoExploreTile extends ConsumerWidget {
               // Use LayoutBuilder to get actual dimensions and pass to thumbnail
               LayoutBuilder(
                 builder: (context, constraints) {
-                  Log.info(
-                    '🎬 VideoExploreTile - Video ${video.id.substring(0, 8)} - thumbnail: ${video.thumbnailUrl}, blurhash: ${video.blurhash}',
-                    name: 'VideoExploreTile',
-                    category: LogCategory.ui,
-                  );
                   return VideoThumbnailWidget(
                     video: video,
                     width: constraints.maxWidth,

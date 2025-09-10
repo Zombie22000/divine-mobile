@@ -8,6 +8,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:openvine/models/pending_upload.dart';
 import 'package:openvine/services/circuit_breaker_service.dart';
 import 'package:openvine/services/direct_upload_service.dart';
+import 'package:openvine/services/upload_initialization_helper.dart';
 import 'package:openvine/utils/async_utils.dart';
 import 'package:openvine/utils/unified_logger.dart';
 
@@ -76,25 +77,37 @@ class UploadManager  {
   final Map<String, UploadMetrics> _uploadMetrics = {};
   final Map<String, Timer> _retryTimers = {};
 
+  bool _isInitialized = false;
+  
+  /// Check if the upload manager is initialized
+  bool get isInitialized => _isInitialized && _uploadsBox != null;
+
   /// Initialize the upload manager and load persisted uploads
+  /// Uses robust initialization with retry logic and recovery strategies
   Future<void> initialize() async {
-    Log.debug('Initializing UploadManager',
+    if (_isInitialized && _uploadsBox != null && _uploadsBox!.isOpen) {
+      Log.info('UploadManager already initialized',
+          name: 'UploadManager', category: LogCategory.video);
+      return;
+    }
+
+    Log.info('🚀 Initializing UploadManager with robust retry logic',
         name: 'UploadManager', category: LogCategory.video);
 
     try {
-      // Initialize Hive adapters
-      if (!Hive.isAdapterRegistered(1)) {
-        Hive.registerAdapter(UploadStatusAdapter());
-      }
-      if (!Hive.isAdapterRegistered(2)) {
-        Hive.registerAdapter(PendingUploadAdapter());
+      // Use the robust initialization helper
+      _uploadsBox = await UploadInitializationHelper.initializeUploadsBox(
+        forceReinit: !_isInitialized,
+      );
+      
+      if (_uploadsBox == null || !_uploadsBox!.isOpen) {
+        throw Exception('Failed to initialize uploads box after all recovery attempts');
       }
 
-      // Open the uploads box
-      _uploadsBox = await Hive.openBox<PendingUpload>(_uploadsBoxName);
+      _isInitialized = true;
 
       Log.info(
-          'UploadManager initialized with ${_uploadsBox!.length} existing uploads',
+          '✅ UploadManager initialized successfully with ${_uploadsBox!.length} existing uploads',
           name: 'UploadManager',
           category: LogCategory.video);
 
@@ -104,13 +117,25 @@ class UploadManager  {
       // Resume any interrupted uploads
       await _resumeInterruptedUploads();
     } catch (e, stackTrace) {
-      Log.error('Failed to initialize UploadManager: $e',
+      _isInitialized = false;
+      _uploadsBox = null;
+      
+      // Log the error but don't rethrow immediately - the helper already retried
+      Log.error('❌ Failed to initialize UploadManager after all retries: $e',
           name: 'UploadManager', category: LogCategory.video);
       Log.verbose('📱 Stack trace: $stackTrace',
           name: 'UploadManager', category: LogCategory.video);
-      rethrow;
+      
+      // Store the error for later retry
+      _initializationError = e;
+      
+      // Don't rethrow - allow the app to continue and retry on demand
+      // rethrow;
     }
   }
+  
+  // Store initialization error for potential retry
+  dynamic _initializationError;
 
   /// Get all pending uploads
   List<PendingUpload> get pendingUploads {
@@ -190,6 +215,40 @@ class UploadManager  {
   }) async {
     Log.info('🚀 === STARTING UPLOAD ===',
         name: 'UploadManager', category: LogCategory.video);
+    
+    // Ensure initialization with robust retry
+    if (!isInitialized || _uploadsBox == null || !_uploadsBox!.isOpen) {
+      Log.warning('UploadManager not ready, attempting robust initialization...',
+          name: 'UploadManager', category: LogCategory.video);
+      
+      try {
+        // Use the robust helper directly for immediate retry
+        _uploadsBox = await UploadInitializationHelper.initializeUploadsBox(
+          forceReinit: true,
+        );
+        
+        if (_uploadsBox != null && _uploadsBox!.isOpen) {
+          _isInitialized = true;
+          _initializationError = null;
+          Log.info('✅ Robust initialization successful',
+              name: 'UploadManager', category: LogCategory.video);
+        } else {
+          throw Exception('Box initialization returned null or closed box');
+        }
+      } catch (e) {
+        Log.error('❌ Robust initialization failed: $e',
+            name: 'UploadManager', category: LogCategory.video);
+        
+        // Check if circuit breaker is active
+        final debugState = UploadInitializationHelper.getDebugState();
+        if (debugState['circuitBreakerActive'] == true) {
+          throw Exception('Upload service temporarily unavailable - too many failures. Please try again later.');
+        }
+        
+        throw Exception('Failed to initialize upload storage after multiple retries: $e');
+      }
+    }
+    
     Log.info('📁 Video path: ${videoFile.path}',
         name: 'UploadManager', category: LogCategory.video);
     Log.info('📊 File exists: ${videoFile.existsSync()}',
@@ -198,7 +257,7 @@ class UploadManager  {
       Log.info('📊 File size: ${videoFile.lengthSync()} bytes',
           name: 'UploadManager', category: LogCategory.video);
     }
-    Log.info('👤 Nostr pubkey: ${nostrPubkey.substring(0, 8)}...',
+    Log.info('👤 Nostr pubkey: ${nostrPubkey.length > 8 ? nostrPubkey.substring(0, 8) + '...' : nostrPubkey}',
         name: 'UploadManager', category: LogCategory.video);
     Log.info('📝 Title: $title',
         name: 'UploadManager', category: LogCategory.video);
@@ -354,7 +413,7 @@ class UploadManager  {
         name: 'UploadManager', category: LogCategory.video);
     Log.info('📁 Video: ${videoFile.path}',
         name: 'UploadManager', category: LogCategory.video);
-    Log.info('👤 Pubkey: ${upload.nostrPubkey.substring(0, 8)}...',
+    Log.info('👤 Pubkey: ${upload.nostrPubkey.length > 8 ? upload.nostrPubkey.substring(0, 8) + '...' : upload.nostrPubkey}',
         name: 'UploadManager', category: LogCategory.video);
     Log.info('📝 Title: ${upload.title}',
         name: 'UploadManager', category: LogCategory.video);
@@ -729,22 +788,94 @@ class UploadManager  {
     }
   }
 
-  /// Save upload to local storage
+  /// Save upload to local storage with robust retry logic
   Future<void> _saveUpload(PendingUpload upload) async {
-    if (_uploadsBox == null) {
-      Log.error('❌ UploadManager not initialized - _uploadsBox is null!',
-          name: 'UploadManager', category: LogCategory.video);
-      throw Exception('UploadManager not initialized');
+    // First attempt with existing box
+    if (_uploadsBox != null && _uploadsBox!.isOpen) {
+      try {
+        await _uploadsBox!.put(upload.id, upload);
+        Log.info('✅ Upload saved to Hive box with ID: ${upload.id}',
+            name: 'UploadManager', category: LogCategory.video);
+        return;
+      } catch (e) {
+        Log.warning('Failed to save with existing box: $e, attempting recovery...',
+            name: 'UploadManager', category: LogCategory.video);
+      }
     }
-
+    
+    // Box is null or save failed - use robust initialization
+    Log.warning('Upload box not ready, using robust initialization...',
+        name: 'UploadManager', category: LogCategory.video);
+    
     try {
+      _uploadsBox = await UploadInitializationHelper.initializeUploadsBox(
+        forceReinit: true,
+      );
+      
+      if (_uploadsBox == null || !_uploadsBox!.isOpen) {
+        throw Exception('Failed to initialize box for saving upload');
+      }
+      
+      _isInitialized = true;
+      
+      // Retry save with new box
       await _uploadsBox!.put(upload.id, upload);
-      Log.info('✅ Upload saved to Hive box',
+      Log.info('✅ Upload saved after robust initialization: ${upload.id}',
           name: 'UploadManager', category: LogCategory.video);
+      
     } catch (e) {
-      Log.error('❌ Failed to save upload to Hive: $e',
+      Log.error('❌ Failed to save upload after all retries: $e',
           name: 'UploadManager', category: LogCategory.video);
-      rethrow;
+      
+      // As a last resort, queue the upload for later
+      _queueUploadForLater(upload);
+      
+      throw Exception('Unable to save upload: Storage initialization failed after multiple attempts');
+    }
+  }
+  
+  // Queue for uploads that couldn't be saved immediately
+  final List<PendingUpload> _pendingSaveQueue = [];
+  Timer? _saveQueueTimer;
+  
+  /// Queue upload for later save attempt
+  void _queueUploadForLater(PendingUpload upload) {
+    Log.warning('Queueing upload ${upload.id} for later save attempt',
+        name: 'UploadManager', category: LogCategory.video);
+    
+    _pendingSaveQueue.add(upload);
+    
+    // Schedule retry in 5 seconds
+    _saveQueueTimer?.cancel();
+    _saveQueueTimer = Timer(const Duration(seconds: 5), _processSaveQueue);
+  }
+  
+  /// Process queued uploads
+  Future<void> _processSaveQueue() async {
+    if (_pendingSaveQueue.isEmpty) return;
+    
+    Log.info('Processing ${_pendingSaveQueue.length} queued uploads',
+        name: 'UploadManager', category: LogCategory.video);
+    
+    final queue = List<PendingUpload>.from(_pendingSaveQueue);
+    _pendingSaveQueue.clear();
+    
+    for (final upload in queue) {
+      try {
+        await _saveUpload(upload);
+        Log.info('Successfully saved queued upload: ${upload.id}',
+            name: 'UploadManager', category: LogCategory.video);
+      } catch (e) {
+        Log.error('Failed to save queued upload ${upload.id}: $e',
+            name: 'UploadManager', category: LogCategory.video);
+        // Re-queue for another attempt
+        _pendingSaveQueue.add(upload);
+      }
+    }
+    
+    // If there are still pending uploads, schedule another retry
+    if (_pendingSaveQueue.isNotEmpty) {
+      _saveQueueTimer = Timer(const Duration(seconds: 30), _processSaveQueue);
     }
   }
 
@@ -1029,13 +1160,23 @@ class UploadManager  {
       timer.cancel();
     }
     _retryTimers.clear();
+    
+    // Cancel save queue timer
+    _saveQueueTimer?.cancel();
+    _saveQueueTimer = null;
 
     // Clean up old metrics
     _cleanupOldMetrics();
 
     // Close Hive box
     _uploadsBox?.close();
-
+    _uploadsBox = null;
+    _isInitialized = false;
     
+    // Clear any pending saves
+    _pendingSaveQueue.clear();
+    
+    Log.info('UploadManager disposed',
+        name: 'UploadManager', category: LogCategory.video);
   }
 }

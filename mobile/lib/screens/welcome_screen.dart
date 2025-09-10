@@ -27,7 +27,7 @@ class WelcomeScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 24),
                 const Text(
-                  'Welcome to OpenVine',
+                  'Welcome to divine',
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,

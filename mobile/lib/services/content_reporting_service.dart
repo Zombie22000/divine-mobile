@@ -97,7 +97,7 @@ class ContentReportingService  {
   final INostrService _nostrService;
   final SharedPreferences _prefs;
 
-  // OpenVine moderation relay for reports
+  // divine moderation relay for reports
   static const String moderationRelayUrl = 'wss://localhost:8080'; // Embedded relay
   static const String reportsStorageKey = 'content_reports_history';
 
@@ -367,7 +367,7 @@ class ContentReportingService  {
     }
 
     buffer.writeln(
-        'Reported via OpenVine for community safety and Apple App Store compliance');
+        'Reported via divine for community safety and Apple App Store compliance');
     return buffer.toString();
   }
 

@@ -90,8 +90,123 @@ void main() async {
     }
   };
 
+  // Configure global error widget builder for user-friendly error display
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    // In debug mode, show detailed error information
+    if (kDebugMode) {
+      return Container(
+        color: const Color(0xFF1A1A1A),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.bug_report,
+                  color: Colors.orange,
+                  size: 48,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Debug Error',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Text(
+                      details.exception.toString(),
+                      style: const TextStyle(color: Colors.white70, fontSize: 14),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    // In debug mode, just log the error
+                    Log.warning('User acknowledged debug error: ${details.exception}',
+                        name: 'ErrorWidget');
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Restart App'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    
+    // In release mode, show user-friendly error message
+    return Container(
+      color: const Color(0xFF1A1A1A),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                color: Colors.red,
+                size: 64,
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Something went wrong',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'We encountered an unexpected issue. Please try restarting the app.',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 16,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton.icon(
+                onPressed: () {
+                  // Log error for analytics in release mode
+                  Log.error('User encountered widget error: ${details.exception}',
+                      name: 'ErrorWidget');
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Try again'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4CAF50),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  };
+
   // Handle Flutter framework errors more gracefully
   FlutterError.onError = (details) {
+    // Log all errors for debugging
+    Log.error('Flutter Error: ${details.exception}',
+        name: 'Main', category: LogCategory.system);
+    
     // Log the error but don't crash the app for known framework issues
     if (details.exception.toString().contains('KeyDownEvent') ||
         details.exception.toString().contains('HardwareKeyboard')) {
@@ -101,27 +216,27 @@ void main() async {
       return;
     }
 
-    // For other errors, use default handling
+    // For other errors, use default handling which will now use our ErrorWidget.builder
     FlutterError.presentError(details);
   };
 
   // Initialize Hive for local data storage
   await Hive.initFlutter();
 
-  Log.info('OpenVine starting...', name: 'Main');
+  Log.info('divine starting...', name: 'Main');
   Log.info('Log level: ${UnifiedLogger.currentLevel.name}', name: 'Main');
 
-  runApp(const OpenVineApp());
+  runApp(const DivineApp());
 }
 
-class OpenVineApp extends StatelessWidget {
-  const OpenVineApp({super.key});
+class DivineApp extends StatelessWidget {
+  const DivineApp({super.key});
 
   @override
   Widget build(BuildContext context) => ProviderScope(
         child: AppLifecycleHandler(
           child: MaterialApp(
-            title: 'OpenVine',
+            title: 'divine',
             debugShowCheckedModeBanner: false,
             theme: VineTheme.theme,
             home: const ResponsiveWrapper(child: AppInitializer()),
@@ -142,6 +257,9 @@ class AppInitializer extends ConsumerStatefulWidget {
 class _AppInitializerState extends ConsumerState<AppInitializer> {
   bool _isInitialized = false;
   String _initializationStatus = 'Initializing services...';
+  bool _hasCriticalError = false;
+  String? _criticalErrorMessage;
+  bool _canRetry = false;
 
   @override
   void initState() {
@@ -234,17 +352,133 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
           name: 'Main', category: LogCategory.system);
 
       if (mounted) {
+        // Determine if this is a critical error that should block navigation
+        final errorMessage = e.toString();
+        final isCriticalError = _isCriticalServiceFailure(errorMessage);
+        
         setState(() {
-          _isInitialized = true; // Continue anyway with basic functionality
-          _initializationStatus = 'Initialization completed with errors';
+          if (isCriticalError) {
+            // Critical errors block navigation - show error screen with retry option
+            _hasCriticalError = true;
+            _criticalErrorMessage = _getFriendlyErrorMessage(errorMessage);
+            _canRetry = true;
+            // DO NOT set _isInitialized = true for critical errors
+            _initializationStatus = 'Critical service failure';
+          } else {
+            // Non-critical errors allow navigation with degraded functionality
+            _isInitialized = true;
+            _initializationStatus = 'Initialization completed with warnings';
+          }
         });
       }
     }
   }
 
+  /// Determines if a service failure is critical and should block navigation
+  bool _isCriticalServiceFailure(String errorMessage) {
+    // Critical services that must work for the app to function
+    return errorMessage.contains('Nostr service') ||
+           errorMessage.contains('Authentication') ||
+           errorMessage.contains('AuthService') ||
+           errorMessage.contains('Critical service') ||
+           errorMessage.contains('auth') && errorMessage.contains('failed');
+  }
+
+  /// Converts technical error messages to user-friendly messages
+  String _getFriendlyErrorMessage(String technicalError) {
+    if (technicalError.contains('Nostr')) {
+      return 'Unable to connect to the Nostr network. Please check your internet connection.';
+    } else if (technicalError.contains('auth') || technicalError.contains('Authentication')) {
+      return 'Authentication service failed to initialize. Your identity could not be loaded.';
+    } else {
+      return 'A critical service failed to start. The app cannot function properly.';
+    }
+  }
+
+  /// Retry initialization after a critical error
+  Future<void> _retryInitialization() async {
+    setState(() {
+      _hasCriticalError = false;
+      _criticalErrorMessage = null;
+      _canRetry = false;
+      _initializationStatus = 'Retrying initialization...';
+    });
+    
+    // Wait a moment before retrying
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    if (mounted) {
+      _initializeServices();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Show critical error screen if we have critical errors (blocks navigation)
+    if (_hasCriticalError) {
+      return Scaffold(
+        backgroundColor: VineTheme.backgroundColor,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  color: Colors.red,
+                  size: 64,
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Unable to Start App',
+                  style: TextStyle(
+                    color: VineTheme.primaryText,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _criticalErrorMessage ?? 'A critical service failed to initialize.',
+                  style: const TextStyle(
+                    color: VineTheme.secondaryText,
+                    fontSize: 16,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                if (_canRetry) ...[
+                  ElevatedButton.icon(
+                    onPressed: _retryInitialization,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: VineTheme.vineGreen,
+                      foregroundColor: VineTheme.whiteText,
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () => _initializeServices(),
+                    child: Text(
+                      'Skip and try anyway (may not work properly)',
+                      style: TextStyle(
+                        color: VineTheme.secondaryText.withValues(alpha: 0.7),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    
     if (!_isInitialized) {
       return Scaffold(
         backgroundColor: VineTheme.backgroundColor,

@@ -1,4 +1,4 @@
-// ABOUTME: HTTP API service for communicating with the OpenVine backend
+// ABOUTME: HTTP API service for communicating with the divine backend
 import 'package:flutter/foundation.dart';// ABOUTME: Handles ready events polling, authentication, and error handling
 
 import 'dart:async';
@@ -144,7 +144,7 @@ class ApiService  {
     final headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'User-Agent': 'OpenVine-Mobile/1.0',
+      'User-Agent': 'divine-Mobile/1.0',
     };
 
     // Add NIP-98 authentication if available

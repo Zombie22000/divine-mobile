@@ -1,7 +1,7 @@
-// ABOUTME: System-wide constants and configuration values for OpenVine
+// ABOUTME: System-wide constants and configuration values for divine
 // ABOUTME: Centralized place for all app constants to avoid magic numbers and scattered values
 
-/// System-wide constants for OpenVine application
+/// System-wide constants for divine application
 class AppConstants {
   // ============================================================================
   // NOSTR PUBKEYS

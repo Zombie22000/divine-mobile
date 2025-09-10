@@ -82,6 +82,7 @@ abstract class INostrService {
   Future<void> removeRelay(String relayUrl);
   Map<String, bool> getRelayStatus();
   Future<void> reconnectAll();
+  Future<void> retryInitialization();
 
   // Subscription management
   Future<void> closeAllSubscriptions();

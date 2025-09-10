@@ -32,7 +32,7 @@ class BulkThumbnailGenerator {
 
   /// Main entry point for the script
   static Future<void> main(List<String> args) async {
-    Log.info('🚀 OpenVine Bulk Thumbnail Generator',  name: 'BulkThumbnailGenerator');
+    Log.info('🚀 divine Bulk Thumbnail Generator',  name: 'BulkThumbnailGenerator');
     Log.info('====================================',  name: 'BulkThumbnailGenerator');
 
     // Parse command line arguments

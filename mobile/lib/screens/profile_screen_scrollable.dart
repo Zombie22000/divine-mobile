@@ -657,7 +657,21 @@ class _ProfileScreenScrollableState extends ConsumerState<ProfileScreenScrollabl
                 }
 
                 final videoEvent = profileVideosAsync.value?[index];
-                if (videoEvent == null) return Container();
+                if (videoEvent == null) {
+                  // Show loading placeholder instead of empty Container
+                  return DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: VineTheme.cardBackground,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: VineTheme.vineGreen,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  );
+                }
 
                 return DecoratedBox(
                     decoration: BoxDecoration(

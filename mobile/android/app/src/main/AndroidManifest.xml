@@ -23,7 +23,7 @@
         android:name="android.hardware.wifi.direct"
         android:required="false" />
     <application
-        android:label="OpenVines"
+        android:label="divine"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

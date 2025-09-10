@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:openvine/models/pending_upload.dart';
+import 'package:openvine/theme/vine_theme.dart';
 
 /// Widget that displays upload progress for a video
 class UploadProgressIndicator extends StatelessWidget {
@@ -105,9 +106,9 @@ class UploadProgressIndicator extends StatelessWidget {
       case UploadStatus.processing:
         return const Icon(Icons.settings, color: Colors.blue);
       case UploadStatus.readyToPublish:
-        return const Icon(Icons.publish, color: Colors.green);
+        return Icon(Icons.publish, color: VineTheme.vineGreen);
       case UploadStatus.published:
-        return const Icon(Icons.check_circle, color: Colors.green);
+        return Icon(Icons.check_circle, color: VineTheme.vineGreen);
       case UploadStatus.failed:
         return const Icon(Icons.error, color: Colors.red);
       case UploadStatus.paused:
@@ -224,9 +225,9 @@ class UploadProgressIndicator extends StatelessWidget {
       case UploadStatus.processing:
         return Colors.blue;
       case UploadStatus.readyToPublish:
-        return Colors.green;
+        return VineTheme.vineGreen;
       case UploadStatus.published:
-        return Colors.green;
+        return VineTheme.vineGreen;
       case UploadStatus.failed:
         return Colors.red;
       case UploadStatus.paused:
@@ -245,9 +246,9 @@ class UploadProgressIndicator extends StatelessWidget {
       case UploadStatus.processing:
         return Colors.blue;
       case UploadStatus.readyToPublish:
-        return Colors.green;
+        return VineTheme.vineGreen;
       case UploadStatus.published:
-        return Colors.green;
+        return VineTheme.vineGreen;
       case UploadStatus.failed:
         return Colors.red;
       case UploadStatus.paused:

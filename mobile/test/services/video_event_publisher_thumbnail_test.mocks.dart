@@ -83,6 +83,12 @@ class MockUploadManager extends _i1.Mock implements _i6.UploadManager {
   }
 
   @override
+  bool get isInitialized => (super.noSuchMethod(
+        Invocation.getter(#isInitialized),
+        returnValue: false,
+      ) as bool);
+
+  @override
   List<_i2.PendingUpload> get pendingUploads => (super.noSuchMethod(
         Invocation.getter(#pendingUploads),
         returnValue: <_i2.PendingUpload>[],
@@ -498,6 +504,7 @@ class MockINostrService extends _i1.Mock implements _i4.INostrService {
   _i7.Stream<_i10.Event> subscribeToEvents({
     required List<_i11.Filter>? filters,
     bool? bypassLimits = false,
+    void Function()? onEose,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -506,6 +513,7 @@ class MockINostrService extends _i1.Mock implements _i4.INostrService {
           {
             #filters: filters,
             #bypassLimits: bypassLimits,
+            #onEose: onEose,
           },
         ),
         returnValue: _i7.Stream<_i10.Event>.empty(),
@@ -591,6 +599,16 @@ class MockINostrService extends _i1.Mock implements _i4.INostrService {
   _i7.Future<void> reconnectAll() => (super.noSuchMethod(
         Invocation.method(
           #reconnectAll,
+          [],
+        ),
+        returnValue: _i7.Future<void>.value(),
+        returnValueForMissingStub: _i7.Future<void>.value(),
+      ) as _i7.Future<void>);
+
+  @override
+  _i7.Future<void> retryInitialization() => (super.noSuchMethod(
+        Invocation.method(
+          #retryInitialization,
           [],
         ),
         returnValue: _i7.Future<void>.value(),

@@ -54,55 +54,19 @@ class _VideoThumbnailWidgetState extends State<VideoThumbnailWidget> {
   }
 
   Future<void> _loadThumbnail() async {
-    // Debug logging
-    final videoIdPrefix = widget.video.id.length >= 8 
-        ? widget.video.id.substring(0, 8) 
-        : widget.video.id;
-    Log.info(
-      '🖼️ Loading thumbnail for video $videoIdPrefix...',
-      name: 'VideoThumbnailWidget',
-      category: LogCategory.ui,
-    );
-    Log.info(
-      '🖼️ Video thumbnail URL: ${widget.video.thumbnailUrl}',
-      name: 'VideoThumbnailWidget',
-      category: LogCategory.ui,
-    );
-    Log.info(
-      '🖼️ Video blurhash: ${widget.video.blurhash}',
-      name: 'VideoThumbnailWidget',
-      category: LogCategory.ui,
-    );
 
     // Check if we have an existing thumbnail URL
     if (widget.video.thumbnailUrl != null && widget.video.thumbnailUrl!.isNotEmpty) {
-      Log.debug(
-        '🖼️ Using existing thumbnail URL: ${widget.video.thumbnailUrl}',
-        name: 'VideoThumbnailWidget',
-        category: LogCategory.ui,
-      );
       setState(() {
         _thumbnailUrl = widget.video.thumbnailUrl;
         _isLoading = false;
       });
       return;
     }
-
-    // No thumbnail URL - try to generate one using API service
-    Log.debug(
-      '🖼️ No thumbnail URL provided - attempting to generate via API service',
-      name: 'VideoThumbnailWidget',
-      category: LogCategory.ui,
-    );
     
     try {
       final generatedThumbnailUrl = await widget.video.getApiThumbnailUrl();
       if (generatedThumbnailUrl != null && generatedThumbnailUrl.isNotEmpty) {
-        Log.info(
-          '✅ Generated thumbnail URL for video $videoIdPrefix: $generatedThumbnailUrl',
-          name: 'VideoThumbnailWidget',
-          category: LogCategory.ui,
-        );
         setState(() {
           _thumbnailUrl = generatedThumbnailUrl;
           _isLoading = false;
@@ -110,19 +74,8 @@ class _VideoThumbnailWidgetState extends State<VideoThumbnailWidget> {
         return;
       }
     } catch (e) {
-      Log.error(
-        '❌ Failed to generate thumbnail for video $videoIdPrefix: $e',
-        name: 'VideoThumbnailWidget',
-        category: LogCategory.ui,
-      );
+      // Silently fail - will use blurhash or placeholder
     }
-    
-    // Fallback: use blurhash or placeholder
-    Log.debug(
-      '🖼️ No thumbnail generation possible - will use blurhash or placeholder',
-      name: 'VideoThumbnailWidget',
-      category: LogCategory.ui,
-    );
     
     setState(() {
       _thumbnailUrl = null;
@@ -131,11 +84,6 @@ class _VideoThumbnailWidgetState extends State<VideoThumbnailWidget> {
   }
 
   Widget _buildContent() {
-    Log.debug(
-      '🖼️ Building content - isLoading: $_isLoading, thumbnailUrl: $_thumbnailUrl, blurhash: ${widget.video.blurhash}',
-      name: 'VideoThumbnailWidget',
-      category: LogCategory.ui,
-    );
     
     // While determining what thumbnail to use, show blurhash if available
     if (_isLoading && widget.video.blurhash != null) {

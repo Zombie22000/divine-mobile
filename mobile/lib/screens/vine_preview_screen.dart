@@ -615,7 +615,7 @@ class _VinePreviewScreenState extends ConsumerState<VinePreviewScreen> {
         nostrPubkey: userPubkey,
         title: 'Vine Video', // Will be updated when user publishes
         description:
-            'Created with OpenVine', // Will be updated when user publishes
+            'Created with divine', // Will be updated when user publishes
         hashtags: ['openvine'], // Will be updated when user publishes
       );
 

@@ -76,7 +76,7 @@ class UserProfile {
   final String? nip05;
 }
 
-/// Main authentication service for the OpenVine app
+/// Main authentication service for the divine app
 /// REFACTORED: Removed ChangeNotifier - now uses pure state management via Riverpod
 class AuthService {
   AuthService({SecureKeyStorageService? keyStorage})
@@ -394,7 +394,7 @@ class AuthService {
           // Use appropriate timestamp backdating based on event kind
           final driftTolerance = NostrTimestamp.getDriftToleranceForKind(kind);
 
-          // CRITICAL: OpenVine relays require specific tags for storage
+          // CRITICAL: divine relays require specific tags for storage
           final eventTags = List<List<String>>.from(tags ?? []);
 
           // CRITICAL: Kind 0 events require expiration tag FIRST (matching Python script order)

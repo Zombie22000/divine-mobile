@@ -1,6 +1,6 @@
 {
-    "name": "OpenVine",
-    "short_name": "OpenVine",
+    "name": "divine",
+    "short_name": "divine",
     "start_url": "/",
     "scope": "/",
     "display": "standalone",

@@ -166,7 +166,7 @@ class Analytics extends _$Analytics {
             Uri.parse(_analyticsEndpoint),
             headers: {
               'Content-Type': 'application/json',
-              'User-Agent': 'OpenVine-Mobile/1.0',
+              'User-Agent': 'divine-Mobile/1.0',
             },
             body: jsonEncode(viewData),
           )

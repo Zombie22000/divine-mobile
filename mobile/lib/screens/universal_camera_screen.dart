@@ -298,7 +298,7 @@ class _UniversalCameraScreenState extends ConsumerState<UniversalCameraScreen> {
             kIsWeb
                 ? 'Please connect a webcam to record videos.'
                 : (!kIsWeb && (Platform.isAndroid || Platform.isIOS))
-                    ? 'OpenVine needs camera access to record videos. Please check your camera permissions in Settings.'
+                    ? 'divine needs camera access to record videos. Please check your camera permissions in Settings.'
                     : 'Please connect a webcam to record videos.',
             style: const TextStyle(color: Colors.white60, fontSize: 14),
             textAlign: TextAlign.center,
@@ -310,13 +310,13 @@ class _UniversalCameraScreenState extends ConsumerState<UniversalCameraScreen> {
                _errorMessage?.contains('PermissionDeniedError') == true) {
       title = 'Camera Permission Needed';
       icon = Icons.camera_alt;
-      message = 'OpenVine needs camera access to record videos.';
+      message = 'divine needs camera access to record videos.';
       actionText = 'Grant Permission';
       additionalInfo.addAll([
         const Padding(
           padding: EdgeInsets.only(top: 16),
           child: Text(
-            'To record and share videos, OpenVine needs permission to use your camera.',
+            'To record and share videos, divine needs permission to use your camera.',
             style: TextStyle(color: Colors.white60, fontSize: 14),
             textAlign: TextAlign.center,
           ),
@@ -353,7 +353,7 @@ class _UniversalCameraScreenState extends ConsumerState<UniversalCameraScreen> {
         const Padding(
           padding: EdgeInsets.only(top: 16),
           child: Text(
-            'Please access OpenVine using HTTPS for camera functionality.',
+            'Please access divine using HTTPS for camera functionality.',
             style: TextStyle(color: Colors.white60, fontSize: 14),
             textAlign: TextAlign.center,
           ),

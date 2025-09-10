@@ -125,10 +125,10 @@ class CurationSet {
   int get hashCode => Object.hash(id, curatorPubkey);
 }
 
-/// Predefined curation set types for OpenVine
+/// Predefined curation set types for divine
 enum CurationSetType {
   editorsPicks(
-      'editors_picks', "Editor's Picks", 'Curated collection from OpenVine'),
+      'editors_picks', "Editor's Picks", 'Curated collection from divine'),
   trending(
       'trending', 'Trending', 'Videos getting the most likes and shares right now');
 

@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased Changes]
 
+### Added
+- **Enhanced Error Handling and Recovery**: Comprehensive global error management system
+  - Global error handler with graceful UI fallback for unhandled exceptions
+  - Custom error widget with retry capability for runtime errors
+  - Automatic service initialization retry with exponential backoff
+  - Proper error boundary implementation to prevent app crashes
+  - Detailed error logging and user-friendly error messages
+
+- **Improved Upload Manager**: Robust upload handling with better error recovery
+  - Enhanced error handling for network failures and timeouts
+  - Automatic retry logic with exponential backoff for failed uploads
+  - Better state management for upload progress tracking
+  - Clearer error messages for various upload failure scenarios
+  - Graceful handling of Hive storage errors
+
+- **Enhanced Relay Settings**: Improved relay management UI and functionality
+  - Better visual feedback for relay connection states
+  - Improved error handling for relay operations
+  - More informative status messages
+  - Enhanced validation for relay URLs
+
+- **UI/UX Improvements**: Better visual feedback and user experience
+  - Updated app icons for iOS, macOS, and Android platforms
+  - Enhanced loading states and progress indicators
+  - Improved error message presentation
+  - Better handling of offline states
+
+### Changed
+- **NostrService Enhancement**: Added better error handling and connection management
+  - Improved relay connection error recovery
+  - Better handling of subscription failures
+  - Enhanced event processing error handling
+  
+- **Video Feed Performance**: Optimized feed loading and error recovery
+  - Better handling of video loading failures
+  - Improved feed refresh logic
+  - Enhanced pagination error handling
+
+### Fixed
+- **Critical Upload Issues**: Resolved upload failures and state management problems
+  - Fixed Duration serialization errors in Hive storage
+  - Resolved upload progress tracking issues
+  - Fixed retry logic for failed uploads
+  - Improved error state cleanup
+
+- **Service Initialization**: Fixed startup crashes and initialization failures
+  - Added proper error handling for service initialization
+  - Implemented retry mechanism for failed service starts
+  - Better handling of missing or corrupted local storage
+
+- **UI Rendering Errors**: Fixed various UI crashes and rendering issues
+  - Resolved null reference errors in video feed widgets
+  - Fixed bottom navigation bar rendering on macOS
+  - Improved error boundary handling for widget failures
+
 ### Added (Backend: Cloudflare Stream)
 - Cloudflare Stream upload and CDN integration (phase-in)
   - New POST `/v1/media/request-upload` to create Stream direct upload URLs (NIP-98 auth; per-pubkey rate limit)

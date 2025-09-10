@@ -678,52 +678,62 @@ class _VideoFeedItemState extends ConsumerState<VideoFeedItem>
 
   /// Build video info content without overlay styling
   Widget _buildVideoInfo() {
+    // Check if title and content are the same
+    final title = widget.video.title?.trim() ?? '';
+    final content = widget.video.content.trim();
+    final isDuplicate = title.isNotEmpty && content.isNotEmpty && title == content;
+    
+    // Check if hashtags are already in the content
+    final hashtagsInContent = widget.video.hashtags.isNotEmpty && 
+        widget.video.hashtags.every((tag) => content.contains('#$tag'));
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         // Username/Creator info
         _buildCreatorInfo(),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4), // Reduced from 8
 
         // Repost attribution (if this is a repost)
         if (widget.video.isRepost) ...[
           _buildRepostAttribution(),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4), // Reduced from 8
         ],
 
-        // Video title
-        if (widget.video.title?.isNotEmpty == true) ...[
+        // Video title (skip if duplicate with content)
+        if (title.isNotEmpty && !isDuplicate) ...[
           SelectableText(
-            widget.video.title!,
+            title,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 16,
+              fontSize: 15, // Reduced from 16
               fontWeight: FontWeight.bold,
             ),
             maxLines: 2,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4), // Reduced from 8
         ],
 
-        // Video content/description
-        if (widget.video.content.isNotEmpty) ...[
+        // Video content/description (or use as title if duplicate)
+        if (content.isNotEmpty) ...[
           ClickableHashtagText(
-            text: widget.video.content,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
+            text: content,
+            style: TextStyle(
+              color: isDuplicate ? Colors.white : Colors.white70,
+              fontSize: isDuplicate ? 15 : 14,
+              fontWeight: isDuplicate ? FontWeight.bold : FontWeight.normal,
             ),
-            maxLines: 3,
+            maxLines: isDuplicate ? 2 : 3,
             onVideoStateChange: _pauseVideo,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4), // Reduced from 8
         ],
 
-        // Hashtags
-        if (widget.video.hashtags.isNotEmpty) ...[
+        // Hashtags (only show if not already in content)
+        if (widget.video.hashtags.isNotEmpty && !hashtagsInContent) ...[
           Wrap(
-            spacing: 8,
+            spacing: 6, // Reduced from 8
             children: widget.video.hashtags
                 .take(3)
                 .map(
@@ -733,7 +743,7 @@ class _VideoFeedItemState extends ConsumerState<VideoFeedItem>
                       '#$hashtag',
                       style: const TextStyle(
                         color: Colors.blue,
-                        fontSize: 14,
+                        fontSize: 13, // Reduced from 14
                         fontWeight: FontWeight.w500,
                         decoration: TextDecoration.underline,
                       ),
@@ -742,13 +752,13 @@ class _VideoFeedItemState extends ConsumerState<VideoFeedItem>
                 )
                 .toList(),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 6), // Reduced from 8
         ],
 
         // Metrics (loops/likes) if available
         if (_hasAnyMetrics)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: 4), // Reduced from 8
             child: _buildMetricsRow(),
           ),
 
@@ -1229,101 +1239,113 @@ class _VideoFeedItemState extends ConsumerState<VideoFeedItem>
         ),
       );
 
-  Widget _buildVideoOverlay() => Positioned(
-        bottom: 0,
-        left: 0,
-        right: 0,
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.bottomCenter,
-              end: Alignment.topCenter,
-              colors: [
-                Colors.black.withValues(alpha: 0.8),
-                Colors.transparent,
-              ],
-            ),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Username/Creator info
-              _buildCreatorInfo(),
-              const SizedBox(height: 8),
-
-              // Repost attribution (if this is a repost)
-              if (widget.video.isRepost) ...[
-                _buildRepostAttribution(),
-                const SizedBox(height: 8),
-              ],
-
-              // Video title
-              if (widget.video.title?.isNotEmpty == true) ...[
-                SelectableText(
-                  widget.video.title!,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 8),
-              ],
-
-              // Video content/description
-              if (widget.video.content.isNotEmpty) ...[
-                ClickableHashtagText(
-                  text: widget.video.content,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                  maxLines: 3,
-                  onVideoStateChange: _pauseVideo,
-                ),
-                const SizedBox(height: 8),
-              ],
-
-              // Hashtags
-              if (widget.video.hashtags.isNotEmpty) ...[
-                Wrap(
-                  spacing: 8,
-                  children: widget.video.hashtags
-                      .take(3)
-                      .map(
-                        (hashtag) => GestureDetector(
-                          onTap: () => _navigateToHashtagFeed(hashtag),
-                          child: Text(
-                            '#$hashtag',
-                            style: const TextStyle(
-                              color: Colors.blue,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-                const SizedBox(height: 8),
-              ],
-
-              // Metrics (loops/likes) if available
-              if (_hasAnyMetrics) ...[
-                _buildMetricsRow(),
-                const SizedBox(height: 8),
-              ],
-
-              // Social action buttons
-              _buildSocialActions(),
+  Widget _buildVideoOverlay() {
+    // Check if title and content are the same
+    final title = widget.video.title?.trim() ?? '';
+    final content = widget.video.content.trim();
+    final isDuplicate = title.isNotEmpty && content.isNotEmpty && title == content;
+    
+    // Check if hashtags are already in the content
+    final hashtagsInContent = widget.video.hashtags.isNotEmpty && 
+        widget.video.hashtags.every((tag) => content.contains('#$tag'));
+    
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: [
+              Colors.black.withValues(alpha: 0.8),
+              Colors.transparent,
             ],
           ),
         ),
-      );
+        padding: const EdgeInsets.all(12), // Reduced from 16
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Username/Creator info
+            _buildCreatorInfo(),
+            const SizedBox(height: 4), // Reduced from 8
+
+            // Repost attribution (if this is a repost)
+            if (widget.video.isRepost) ...[
+              _buildRepostAttribution(),
+              const SizedBox(height: 4), // Reduced from 8
+            ],
+
+            // Video title (skip if duplicate with content)
+            if (title.isNotEmpty && !isDuplicate) ...[
+              SelectableText(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15, // Reduced from 16
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 4), // Reduced from 8
+            ],
+
+            // Video content/description (or use as title if duplicate)
+            if (content.isNotEmpty) ...[
+              ClickableHashtagText(
+                text: content,
+                style: TextStyle(
+                  color: isDuplicate ? Colors.white : Colors.white70,
+                  fontSize: isDuplicate ? 15 : 14,
+                  fontWeight: isDuplicate ? FontWeight.bold : FontWeight.normal,
+                ),
+                maxLines: isDuplicate ? 2 : 3,
+                onVideoStateChange: _pauseVideo,
+              ),
+              const SizedBox(height: 4), // Reduced from 8
+            ],
+
+            // Hashtags (only show if not already in content)
+            if (widget.video.hashtags.isNotEmpty && !hashtagsInContent) ...[
+              Wrap(
+                spacing: 6, // Reduced from 8
+                children: widget.video.hashtags
+                    .take(3)
+                    .map(
+                      (hashtag) => GestureDetector(
+                        onTap: () => _navigateToHashtagFeed(hashtag),
+                        child: Text(
+                          '#$hashtag',
+                          style: const TextStyle(
+                            color: Colors.blue,
+                            fontSize: 13, // Reduced from 14
+                            fontWeight: FontWeight.w500,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 6), // Reduced from 8
+            ],
+
+            // Metrics (loops/likes) if available
+            if (_hasAnyMetrics) ...[
+              _buildMetricsRow(),
+              const SizedBox(height: 6), // Reduced from 8
+            ],
+
+            // Social action buttons
+            _buildSocialActions(),
+          ],
+        ),
+      ),
+    );
+  }
 
   bool get _hasAnyMetrics =>
       (widget.video.originalLoops != null && widget.video.originalLoops! > 0) ||
@@ -1654,7 +1676,7 @@ class _VideoFeedItemState extends ConsumerState<VideoFeedItem>
             children: [
               const Icon(
                 Icons.repeat,
-                color: Colors.green,
+                color: VineTheme.vineGreen,
                 size: 16,
               ),
               const SizedBox(width: 6),
@@ -1690,7 +1712,7 @@ class _VideoFeedItemState extends ConsumerState<VideoFeedItem>
                 child: Text(
                   'Reposted by $reposterName',
                   style: const TextStyle(
-                    color: Colors.green,
+                    color: VineTheme.vineGreen,
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                     decoration: TextDecoration.underline,
@@ -1734,7 +1756,7 @@ class _VideoFeedItemState extends ConsumerState<VideoFeedItem>
                 final hasReposted = socialState.hasReposted(widget.video.id);
                 return _buildActionButton(
                   icon: Icons.repeat,
-                  color: hasReposted ? Colors.green : Colors.white,
+                  color: hasReposted ? VineTheme.vineGreen : Colors.white,
                   onPressed: () => _handleRepost(context),
                 );
               },
@@ -2296,7 +2318,7 @@ class _RevineOptionsSheetState extends ConsumerState<_RevineOptionsSheet> {
               Text('Video reposted to your home feed!'),
             ],
           ),
-          backgroundColor: Colors.green,
+          backgroundColor: VineTheme.vineGreen,
         ),
       );
     } catch (e) {
@@ -2358,7 +2380,7 @@ class _RevineOptionsSheetState extends ConsumerState<_RevineOptionsSheet> {
               ),
             ],
           ),
-          backgroundColor: Colors.green,
+          backgroundColor: VineTheme.vineGreen,
         ),
       );
     } catch (e) {
@@ -2412,7 +2434,7 @@ class _RevineOptionsSheetState extends ConsumerState<_RevineOptionsSheet> {
               Text('Video bookmarked!'),
             ],
           ),
-          backgroundColor: Colors.green,
+          backgroundColor: VineTheme.vineGreen,
         ),
       );
     } catch (e) {
@@ -2550,7 +2572,7 @@ class _RevineOptionsSheetState extends ConsumerState<_RevineOptionsSheet> {
                           ),
                         ],
                       ),
-                      backgroundColor: Colors.green,
+                      backgroundColor: VineTheme.vineGreen,
                     ),
                   );
                 }
@@ -2656,13 +2678,13 @@ class _ListSelectionDialog extends ConsumerWidget {
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: isAlreadyInList 
-                          ? Colors.green.withValues(alpha: 0.2)
+                          ? VineTheme.vineGreen.withValues(alpha: 0.2)
                           : VineTheme.vineGreen.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Icon(
                       isAlreadyInList ? Icons.check : Icons.playlist_add,
-                      color: isAlreadyInList ? Colors.green : VineTheme.vineGreen,
+                      color: isAlreadyInList ? VineTheme.vineGreen : VineTheme.vineGreen,
                       size: 18,
                     ),
                   ),
@@ -2687,7 +2709,7 @@ class _ListSelectionDialog extends ConsumerWidget {
                       if (isAlreadyInList)
                         const Text(
                           'Already in this list',
-                          style: TextStyle(color: Colors.green, fontSize: 12),
+                          style: TextStyle(color: VineTheme.vineGreen, fontSize: 12),
                         ),
                     ],
                   ),
@@ -2740,7 +2762,7 @@ class _ListSelectionDialog extends ConsumerWidget {
               ),
             ],
           ),
-          backgroundColor: Colors.green,
+          backgroundColor: VineTheme.vineGreen,
         ),
       );
     } catch (e) {
@@ -2870,7 +2892,7 @@ class _ListSelectionDialog extends ConsumerWidget {
                           ),
                         ],
                       ),
-                      backgroundColor: Colors.green,
+                      backgroundColor: VineTheme.vineGreen,
                     ),
                   );
                 }

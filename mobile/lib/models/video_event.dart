@@ -112,6 +112,14 @@ class VideoEvent {
             developer.log('⚠️ WARNING: Invalid URL in url tag: $tagValue',
                 name: 'VideoEvent');
           }
+        case 'streaming':
+          // Handle streaming tag with HLS/DASH URLs
+          // Format: ["streaming", "url", "format"] e.g., ["streaming", "https://cdn.divine.video/.../video.m3u8", "hls"]
+          if (tagValue.isNotEmpty && _isValidVideoUrl(tagValue)) {
+            videoUrl ??= tagValue; // Use streaming URL if no other video URL is set
+            developer.log('✅ Set videoUrl from streaming tag: $tagValue',
+                name: 'VideoEvent');
+          }
         case 'imeta':
           developer.log('🔍 DEBUG: Found imeta tag with ${tag.length} elements',
               name: 'VideoEvent');
@@ -183,14 +191,27 @@ class VideoEvent {
         case 'size':
           fileSize = int.tryParse(tagValue);
         case 'thumb':
-          // Thumbnail URL
+          // Thumbnail URL - prefer static thumbnails for grid display
           thumbnailUrl = tagValue as String?;
+        case 'preview':
+          // Animated GIF preview - store separately, don't use as main thumbnail
+          // GIFs auto-play and would make the grid look chaotic
+          // We could use this for hover effects or preview on long-press in the future
+          if (tagValue.isNotEmpty && tagValue.endsWith('.gif')) {
+            // Store in tags for potential future use but don't use as main thumbnail
+            tags['preview_gif'] = tagValue;
+            developer.log('✅ Found preview GIF tag (not using as thumbnail): $tagValue',
+                name: 'VideoEvent');
+          }
         case 'image':
           // Alternative to 'thumb' tag - some clients use 'image' instead
           thumbnailUrl ??= tagValue as String?;
         case 'd':
           // Replaceable event ID - original vine ID
           vineId = tagValue as String?;
+        case 'vine_id':
+          // Some clients use 'vine_id' instead of 'd' for the original Vine ID
+          vineId ??= tagValue as String?;
         case 'h':
           // Group/community tag
           group = tagValue as String?;
@@ -687,31 +708,10 @@ class VideoEvent {
       // Must have a valid host
       if (uri.host.isEmpty) return false;
 
-      // Check for video file extensions or known video hosting domains
-      final path = uri.path.toLowerCase();
-      final host = uri.host.toLowerCase();
-
-      // Known video file extensions
-      if (path.endsWith('.mp4') ||
-          path.endsWith('.webm') ||
-          path.endsWith('.mov') ||
-          path.endsWith('.avi') ||
-          path.endsWith('.gif')) {
-        return true;
-      }
-
-      // Known video hosting domains
-      if (host.contains('blossom.primal.net') ||
-          host.contains('nostr.build') ||
-          host.contains('primal.net') ||
-          host.contains('void.cat') ||
-          host.contains('nostpic.com') ||
-          host.contains('openvine.co') ||
-          host.contains('satellite.earth')) {
-        return true;
-      }
-
-      return false;
+      // Accept any valid HTTP/HTTPS URL
+      // This is an open protocol - people can host videos anywhere
+      // The video player will determine if it can actually play the content
+      return true;
     } catch (e) {
       developer.log('🔍 INVALID URL (parse error): $correctedUrl - error: $e', name: 'VideoEvent');
       return false;
