@@ -1,7 +1,6 @@
 // ABOUTME: Tab visibility provider that manages active tab state for IndexedStack coordination
 // ABOUTME: Provides reactive tab switching and visibility state management for video lifecycle
 
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'tab_visibility_provider.g.dart';

@@ -5,6 +5,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openvine/utils/unified_logger.dart';
+import 'package:video_player/video_player.dart';
+import 'package:openvine/main.dart';
 
 /// Pure video metadata screen using revolutionary single-controller Riverpod architecture
 class VideoMetadataScreenPure extends ConsumerStatefulWidget {
@@ -29,6 +31,8 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
   bool _isExpiringPost = false;
   int _expirationHours = 24;
   bool _isPublishing = false;
+  VideoPlayerController? _videoController;
+  bool _isVideoInitialized = false;
 
   @override
   void initState() {
@@ -36,6 +40,30 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
 
     Log.info('📝 VideoMetadataScreenPure: Initialized for file: ${widget.videoFile.path}',
         category: LogCategory.video);
+
+    // Initialize video preview
+    _initializeVideoPreview();
+  }
+
+  Future<void> _initializeVideoPreview() async {
+    try {
+      _videoController = VideoPlayerController.file(widget.videoFile);
+      await _videoController!.initialize();
+      await _videoController!.setLooping(true);
+      await _videoController!.play();
+
+      if (mounted) {
+        setState(() {
+          _isVideoInitialized = true;
+        });
+      }
+
+      Log.info('📝 Video preview initialized successfully',
+          category: LogCategory.video);
+    } catch (e) {
+      Log.error('📝 Failed to initialize video preview: $e',
+          category: LogCategory.video);
+    }
   }
 
   @override
@@ -43,6 +71,7 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
     _titleController.dispose();
     _descriptionController.dispose();
     _hashtagController.dispose();
+    _videoController?.dispose();
     super.dispose();
 
     Log.info('📝 VideoMetadataScreenPure: Disposed',
@@ -91,42 +120,68 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Video info header
+            // Video preview
             Container(
-              padding: const EdgeInsets.all(16),
+              height: 200,
               decoration: BoxDecoration(
-                color: Colors.grey[900],
+                color: Colors.black,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.video_library,
-                    color: Colors.green,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Video Ready',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: _isVideoInitialized && _videoController != null
+                  ? Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        AspectRatio(
+                          aspectRatio: _videoController!.value.aspectRatio,
+                          child: VideoPlayer(_videoController!),
                         ),
-                      ),
-                      Text(
-                        'Duration: ${_formatDuration(widget.duration)}',
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 14,
+                        // Play/pause overlay
+                        Positioned(
+                          bottom: 8,
+                          right: 8,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.loop,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _formatDuration(widget.duration),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
+                      ],
+                    )
+                  : Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const CircularProgressIndicator(color: Colors.green),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Loading preview...',
+                            style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ],
+                    ),
               ),
             ),
             const SizedBox(height: 24),
@@ -350,8 +405,10 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
       await Future.delayed(const Duration(seconds: 2));
 
       if (mounted) {
-        // Navigate back to main feed after successful upload
+        // Navigate to user's own profile after successful upload
         Navigator.of(context).popUntil((route) => route.isFirst);
+        // Navigate to profile tab (null means own profile)
+        mainNavigationKey.currentState?.navigateToProfile(null);
       }
     } catch (e) {
       Log.error('📝 VideoMetadataScreenPure: Failed to publish video: $e',

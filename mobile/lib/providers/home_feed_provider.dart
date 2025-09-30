@@ -125,6 +125,9 @@ class HomeFeed extends _$HomeFeed {
     // Cancel any existing timer
     _profileFetchTimer?.cancel();
 
+    // Check if provider is still mounted after async gap
+    if (!ref.mounted) return;
+
     // Fetch profiles immediately - no delay needed as provider handles batching internally
     final profilesProvider = ref.read(userProfileProvider.notifier);
 
@@ -162,6 +165,9 @@ class HomeFeed extends _$HomeFeed {
   Future<void> loadMore() async {
     final currentState = await future;
 
+    // Check if provider is still mounted after async gap
+    if (!ref.mounted) return;
+
     Log.info(
       'HomeFeed: loadMore() called - isLoadingMore: ${currentState.isLoadingMore}',
       name: 'HomeFeedProvider',
@@ -182,6 +188,7 @@ class HomeFeed extends _$HomeFeed {
 
       if (followingPubkeys.isEmpty) {
         // No one to load more from
+        if (!ref.mounted) return;
         state = AsyncData(currentState.copyWith(
           isLoadingMore: false,
           hasMoreContent: false,
@@ -196,6 +203,9 @@ class HomeFeed extends _$HomeFeed {
       await videoEventService.loadMoreEvents(SubscriptionType.homeFeed,
           limit: 50);
 
+      // Check if provider is still mounted after async gap
+      if (!ref.mounted) return;
+
       final eventCountAfter =
           videoEventService.getEventCount(SubscriptionType.homeFeed);
       final newEventsLoaded = eventCountAfter - eventCountBefore;
@@ -208,6 +218,7 @@ class HomeFeed extends _$HomeFeed {
 
       // Reset loading state - state will auto-update via dependencies
       final newState = await future;
+      if (!ref.mounted) return;
       state = AsyncData(newState.copyWith(
         isLoadingMore: false,
         hasMoreContent: newEventsLoaded > 0,
@@ -219,7 +230,9 @@ class HomeFeed extends _$HomeFeed {
         category: LogCategory.video,
       );
 
+      if (!ref.mounted) return;
       final currentState = await future;
+      if (!ref.mounted) return;
       state = AsyncData(
         currentState.copyWith(
           isLoadingMore: false,

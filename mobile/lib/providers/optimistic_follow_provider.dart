@@ -2,7 +2,6 @@
 // ABOUTME: Enables immediate UI feedback when following/unfollowing users
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
 import 'package:openvine/providers/app_providers.dart';
 
 /// Tracks optimistic follow states that haven't been confirmed yet

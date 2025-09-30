@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openvine/models/video_event.dart';
+import 'package:openvine/providers/app_providers.dart';
 import 'package:openvine/providers/individual_video_providers.dart';
 import 'package:openvine/providers/video_events_providers.dart';
 import 'package:openvine/screens/pure/explore_video_screen_pure.dart';
@@ -437,22 +438,22 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
       child: Container(
         decoration: BoxDecoration(
           color: VineTheme.cardBackground,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(0),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(0),
           child: Column(
             children: [
               // Video thumbnail with play overlay
               Expanded(
-                flex: 4,
+                flex: 5,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -516,53 +517,90 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
                 ),
               ),
               // Video info
-              Expanded(
-                flex: 2,
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        video.title ??
-                        (video.content.length > 25
-                          ? '${video.content.substring(0, 25)}...'
-                          : video.content),
-                        style: TextStyle(
-                          color: VineTheme.primaryText,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+              Padding(
+                padding: const EdgeInsets.all(6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Creator name
+                    _buildCreatorName(video, ref),
+                    const SizedBox(height: 2),
+                    // Title or content
+                    Text(
+                      video.title ??
+                      (video.content.length > 25
+                        ? '${video.content.substring(0, 25)}...'
+                        : video.content),
+                      style: TextStyle(
+                        color: VineTheme.primaryText,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
                       ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.favorite,
-                            size: 12,
-                            color: VineTheme.likeRed,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    // Stats row
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.favorite,
+                          size: 11,
+                          color: VineTheme.likeRed,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${video.originalLikes ?? 0}',
+                          style: TextStyle(
+                            color: VineTheme.secondaryText,
+                            fontSize: 10,
                           ),
-                          const SizedBox(width: 4),
+                        ),
+                        if (video.originalLoops != null) ...[
+                          const SizedBox(width: 8),
+                          Icon(
+                            Icons.repeat,
+                            size: 11,
+                            color: VineTheme.secondaryText,
+                          ),
+                          const SizedBox(width: 3),
                           Text(
-                            '${video.originalLikes ?? 0}',
+                            '${video.originalLoops}',
                             style: TextStyle(
                               color: VineTheme.secondaryText,
                               fontSize: 10,
                             ),
                           ),
                         ],
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildCreatorName(VideoEvent video, WidgetRef ref) {
+    final profileService = ref.watch(userProfileServiceProvider);
+    final profile = profileService.getCachedProfile(video.pubkey);
+    final displayName = profile?.displayName ??
+        profile?.name ??
+        '@${video.pubkey.substring(0, 8)}...';
+
+    return Text(
+      displayName,
+      style: TextStyle(
+        color: VineTheme.secondaryText,
+        fontSize: 10,
+        fontWeight: FontWeight.w400,
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
   }
 

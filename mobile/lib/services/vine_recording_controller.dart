@@ -91,7 +91,17 @@ class MobileCameraInterface extends CameraPlatformInterface {
     _controller =
         CameraController(camera, ResolutionPreset.high, enableAudio: true);
     await _controller!.initialize();
-    await _controller!.prepareForVideoRecording();
+
+    // Prepare for video recording - critical for iOS
+    try {
+      await _controller!.prepareForVideoRecording();
+      Log.info('Video recording preparation successful',
+          name: 'VineRecordingController', category: LogCategory.system);
+    } catch (e) {
+      Log.warning('prepareForVideoRecording failed (may not be supported): $e',
+          name: 'VineRecordingController', category: LogCategory.system);
+      // Continue anyway - some platforms don't need this
+    }
   }
 
   Future<void> _initializeNewCamera() async {
@@ -100,7 +110,15 @@ class MobileCameraInterface extends CameraPlatformInterface {
     _controller =
         CameraController(camera, ResolutionPreset.high, enableAudio: true);
     await _controller!.initialize();
-    await _controller!.prepareForVideoRecording();
+
+    // Prepare for video recording - critical for iOS
+    try {
+      await _controller!.prepareForVideoRecording();
+    } catch (e) {
+      Log.warning('prepareForVideoRecording failed during camera switch: $e',
+          name: 'VineRecordingController', category: LogCategory.system);
+      // Continue anyway - some platforms don't need this
+    }
   }
 
   @override
@@ -827,20 +845,29 @@ class VineRecordingController {
       } else if (Platform.isMacOS) {
         _cameraInterface = MacOSCameraInterface();
       } else if (Platform.isIOS || Platform.isAndroid) {
-        // Try enhanced mobile camera interface first, fallback to basic if it fails
-        try {
-          _cameraInterface = EnhancedMobileCameraInterface();
-          await _cameraInterface!.initialize();
-          Log.info('Using enhanced mobile camera with zoom and focus features',
-              name: 'VineRecordingController', category: LogCategory.system);
-        } catch (enhancedError) {
-          Log.warning('Enhanced camera failed, falling back to basic camera: $enhancedError',
-              name: 'VineRecordingController', category: LogCategory.system);
-          _cameraInterface?.dispose();
+        // Use basic camera for iOS due to performance issues with enhanced camera
+        // Enhanced camera causes dark/slow preview on iOS devices
+        if (Platform.isIOS) {
           _cameraInterface = MobileCameraInterface();
           await _cameraInterface!.initialize();
-          Log.info('Using basic mobile camera interface as fallback',
+          Log.info('Using basic mobile camera for iOS (performance optimization)',
               name: 'VineRecordingController', category: LogCategory.system);
+        } else {
+          // Try enhanced mobile camera interface first for Android, fallback to basic if it fails
+          try {
+            _cameraInterface = EnhancedMobileCameraInterface();
+            await _cameraInterface!.initialize();
+            Log.info('Using enhanced mobile camera with zoom and focus features',
+                name: 'VineRecordingController', category: LogCategory.system);
+          } catch (enhancedError) {
+            Log.warning('Enhanced camera failed, falling back to basic camera: $enhancedError',
+                name: 'VineRecordingController', category: LogCategory.system);
+            _cameraInterface?.dispose();
+            _cameraInterface = MobileCameraInterface();
+            await _cameraInterface!.initialize();
+            Log.info('Using basic mobile camera interface as fallback',
+                name: 'VineRecordingController', category: LogCategory.system);
+          }
         }
       } else {
         throw Exception('Platform not supported: ${Platform.operatingSystem}');

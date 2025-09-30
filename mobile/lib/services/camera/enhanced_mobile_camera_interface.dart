@@ -71,7 +71,7 @@ class EnhancedMobileCameraInterface extends CameraPlatformInterface {
         camera,
         ResolutionPreset.high,
         enableAudio: true,
-        imageFormatGroup: ImageFormatGroup.yuv420,
+        // Remove imageFormatGroup - let iOS use default format for better performance
       );
 
       await _controller!.initialize();

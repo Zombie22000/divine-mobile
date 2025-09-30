@@ -34,8 +34,8 @@ class Curation extends _$Curation {
     ref.listen(videoEventsProvider, (previous, next) {
       // Only refresh if we have new video events
       final prevLength = previous?.hasValue == true ? (previous!.value?.length ?? 0) : 0;
-      final nextLength = (next?.hasValue ?? false) ? (next?.value?.length ?? 0) : 0;
-      if ((next?.hasValue ?? false) && prevLength != nextLength) {
+      final nextLength = (next.hasValue) ? (next.value?.length ?? 0) : 0;
+      if (next.hasValue && prevLength != nextLength) {
         _refreshCurationSets();
       }
     });

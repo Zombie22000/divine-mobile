@@ -1,7 +1,6 @@
 // ABOUTME: VideoManager-compatible provider for VideoOverlayModal integration
 // ABOUTME: Bridges VideoOverlayModal's expected interface with working individual video providers
 
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:openvine/models/video_event.dart';
