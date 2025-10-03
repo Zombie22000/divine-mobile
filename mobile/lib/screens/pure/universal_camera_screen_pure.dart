@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openvine/main.dart';
-import 'package:openvine/providers/individual_video_providers.dart';
 import 'package:openvine/providers/video_overlay_manager_provider.dart';
 import 'package:openvine/providers/vine_recording_provider.dart';
 import 'package:openvine/screens/pure/video_metadata_screen_pure.dart';
@@ -39,14 +38,17 @@ class _UniversalCameraScreenPureState extends ConsumerState<UniversalCameraScree
     super.initState();
     _initializeServices();
 
-    // Pause all background videos when entering camera screen
+    // CRITICAL: Dispose all video controllers when entering camera screen
+    // IndexedStack keeps widgets alive, so we must force-dispose controllers
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
         final videoManager = ref.read(videoOverlayManagerProvider);
-        videoManager.pauseAllVideos();
-        Log.info('📹 UniversalCameraScreenPure: Paused background videos', category: LogCategory.video);
+
+        // Force dispose all video controllers (this also clears active video)
+        videoManager.disposeAllControllers();
+        Log.info('🗑️ UniversalCameraScreenPure: Disposed all video controllers', category: LogCategory.video);
       } catch (e) {
-        Log.warning('📹 Failed to pause background videos: $e', category: LogCategory.video);
+        Log.warning('📹 Failed to dispose video controllers: $e', category: LogCategory.video);
       }
     });
 
@@ -211,13 +213,20 @@ class _UniversalCameraScreenPureState extends ConsumerState<UniversalCameraScree
 
           return Stack(
             children: [
-              // Camera preview (fullscreen)
+              // Camera preview (square/1:1 aspect ratio for Vine-style videos)
               Positioned.fill(
-                child: recordingState.isInitialized
-                  ? ref.read(vineRecordingProvider.notifier).previewWidget
-                  : CameraPreviewPlaceholder(
-                      isRecording: recordingState.isRecording,
+                child: Center(
+                  child: AspectRatio(
+                    aspectRatio: 1.0, // Square format like original Vine
+                    child: ClipRect(
+                      child: recordingState.isInitialized
+                        ? ref.read(vineRecordingProvider.notifier).previewWidget
+                        : CameraPreviewPlaceholder(
+                            isRecording: recordingState.isRecording,
+                          ),
                     ),
+                  ),
+                ),
               ),
 
               // Recording controls overlay (bottom)
@@ -477,6 +486,7 @@ class _UniversalCameraScreenPureState extends ConsumerState<UniversalCameraScree
             color: recordingState.hasSegments ? VineTheme.vineGreen : Colors.white,
             size: recordingState.hasSegments ? 40 : 32,
           ),
+          tooltip: recordingState.hasSegments ? 'Publish video' : 'Cancel',
         ),
 
         // Record button - Platform-specific interaction
@@ -791,15 +801,16 @@ class _UniversalCameraScreenPureState extends ConsumerState<UniversalCameraScree
           Log.info('📹 Returned from metadata screen, navigating to profile',
               category: LogCategory.video);
 
-          // FIRST: Clear any active videos to prevent background playback
-          ref.read(activeVideoProvider.notifier).clearActiveVideo();
-          Log.info('⏸️ Cleared active video before navigation',
-              category: LogCategory.video);
+          // CRITICAL: Dispose all controllers again before navigation
+          // This ensures no stale controllers exist when switching to profile tab
+          final videoManager = ref.read(videoOverlayManagerProvider);
+          videoManager.disposeAllControllers();
+          Log.info('🗑️ Disposed controllers before profile navigation', category: LogCategory.video);
 
           // Pop the camera screen
           Navigator.of(context).pop();
 
-          // Navigate to user's own profile
+          // Navigate to user's own profile (navigateToProfile also clears active video)
           final navState = mainNavigationKey.currentState;
           if (navState != null) {
             navState.navigateToProfile(null);

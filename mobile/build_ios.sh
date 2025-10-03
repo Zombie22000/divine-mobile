@@ -9,8 +9,13 @@ echo "🍎 Building iOS App..."
 # Navigate to project root
 cd "$(dirname "$0")"
 
-# Check for auto-increment flag
-if [[ "$1" == "--increment" || "$2" == "--increment" ]]; then
+# For release builds, ALWAYS increment build number (required by App Store)
+# For debug builds, only increment if --increment flag is passed
+if [ "$1" = "release" ]; then
+    echo "🔢 Auto-incrementing build number (required for App Store)..."
+    ./increment_build_number.sh --auto
+    echo ""
+elif [[ "$1" == "--increment" || "$2" == "--increment" ]]; then
     echo "🔢 Auto-incrementing build number..."
     ./increment_build_number.sh --auto
     echo ""
@@ -130,15 +135,15 @@ elif [ "$1" = "debug" ]; then
 else
     echo "Usage: $0 [debug|release] [--increment]"
     echo "  debug       - Build debug version"
-    echo "  release     - Build release version and create Xcode archive"
-    echo "  --increment - Auto-increment build number before building"
+    echo "  release     - Build release version and create Xcode archive (auto-increments build number)"
+    echo "  --increment - Force auto-increment build number for debug builds"
     echo ""
     echo "Examples:"
-    echo "  $0 release              # Build release without incrementing"
-    echo "  $0 release --increment  # Increment build number and build release"
+    echo "  $0 release              # Build release (automatically increments build number)"
+    echo "  $0 debug --increment    # Build debug with build number increment"
     echo ""
     echo "Building in debug mode by default..."
-    flutter build ios --debug 
+    flutter build ios --debug
 fi
 
 echo "✅ iOS build complete!"

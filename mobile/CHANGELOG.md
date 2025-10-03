@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - Video Controller Memory Management (2025-10-03)
+
+#### Bug Fixes
+- **Fixed video controller disposal when entering camera** - Improved memory management for camera transitions
+  - Camera screen now force-disposes all video controllers on entry (prevents ghost videos)
+  - Additional disposal before navigating to profile after recording
+  - Ensures no stale video controllers exist during tab switches
+  - Prevents background video playback when camera is active
+
+#### Technical Details
+- Modified `lib/screens/pure/universal_camera_screen_pure.dart`:
+  - Lines 44-54: Force dispose all controllers in initState
+  - Lines 807-809: Additional disposal before profile navigation
+  - Improved cleanup prevents IndexedStack widget lifecycle issues
+
+### Changed - iOS Build Process (2025-10-03)
+
+#### Improvements
+- **Auto-increment build number for release builds** - Ensures App Store compliance
+  - Release builds (`./build_ios.sh release`) now automatically increment build number
+  - Debug builds only increment when `--increment` flag is explicitly passed
+  - Updated usage documentation to reflect new behavior
+
+#### Technical Details
+- Modified `build_ios.sh`:
+  - Lines 14-22: Conditional auto-increment logic for release vs debug
+  - Lines 136-143: Updated usage documentation
+
 ### Fixed - Home Feed Video Loading (2025-01-30)
 
 #### Bug Fixes
