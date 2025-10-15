@@ -3,12 +3,16 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openvine/providers/app_lifecycle_provider.dart';
+import 'package:openvine/providers/hashtag_feed_providers.dart';
+import 'package:openvine/providers/profile_feed_providers.dart';
 import 'package:openvine/providers/route_feed_providers.dart';
 import 'package:openvine/router/page_context_provider.dart';
 import 'package:openvine/router/route_utils.dart';
+import 'package:openvine/state/video_feed_state.dart';
 
 /// Active video ID derived from router state and app lifecycle
 /// Returns null when app is backgrounded or no valid video at current index
+/// Route-aware: switches feed provider based on route type
 final activeVideoIdProvider = Provider<String?>((ref) {
   // Check app foreground state
   final isFg = ref.watch(appForegroundProvider).maybeWhen(
@@ -21,11 +25,28 @@ final activeVideoIdProvider = Provider<String?>((ref) {
   final ctx = ref.watch(pageContextProvider).asData?.value;
   if (ctx == null) return null;
 
-  // Get videos for the current route type
-  // For now, only supporting home route (PR5.2 scope)
-  if (ctx.type != RouteType.home) return null;
+  // Select feed provider based on route type
+  AsyncValue<VideoFeedState> videosAsync;
+  switch (ctx.type) {
+    case RouteType.home:
+      videosAsync = ref.watch(videosForHomeRouteProvider);
+      break;
+    case RouteType.profile:
+      videosAsync = ref.watch(videosForProfileRouteProvider);
+      break;
+    case RouteType.hashtag:
+      videosAsync = ref.watch(videosForHashtagRouteProvider);
+      break;
+    case RouteType.explore:
+      // Explore route not yet implemented, use home feed as fallback
+      videosAsync = ref.watch(videosForHomeRouteProvider);
+      break;
+    case RouteType.camera:
+    case RouteType.settings:
+      // Non-video routes - return null
+      return null;
+  }
 
-  final videosAsync = ref.watch(videosForHomeRouteProvider);
   final videos = videosAsync.maybeWhen(
     data: (state) => state.videos,
     orElse: () => const [],

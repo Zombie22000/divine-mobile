@@ -27,6 +27,7 @@ class RouteContext {
 }
 
 /// Parse a URL path into a structured RouteContext
+/// Normalizes negative indices to 0 and decodes URL-encoded parameters
 RouteContext parseRoute(String path) {
   final segments = path.split('/').where((s) => s.isNotEmpty).toList();
 
@@ -38,19 +39,22 @@ RouteContext parseRoute(String path) {
 
   switch (firstSegment) {
     case 'home':
-      final index = segments.length > 1 ? int.tryParse(segments[1]) ?? 0 : 0;
+      final rawIndex = segments.length > 1 ? int.tryParse(segments[1]) ?? 0 : 0;
+      final index = rawIndex < 0 ? 0 : rawIndex; // Normalize negative indices
       return RouteContext(type: RouteType.home, videoIndex: index);
 
     case 'explore':
-      final index = segments.length > 1 ? int.tryParse(segments[1]) ?? 0 : 0;
+      final rawIndex = segments.length > 1 ? int.tryParse(segments[1]) ?? 0 : 0;
+      final index = rawIndex < 0 ? 0 : rawIndex; // Normalize negative indices
       return RouteContext(type: RouteType.explore, videoIndex: index);
 
     case 'profile':
       if (segments.length < 2) {
         return const RouteContext(type: RouteType.home, videoIndex: 0);
       }
-      final npub = segments[1];
-      final index = segments.length > 2 ? int.tryParse(segments[2]) ?? 0 : 0;
+      final npub = Uri.decodeComponent(segments[1]); // Decode URL encoding
+      final rawIndex = segments.length > 2 ? int.tryParse(segments[2]) ?? 0 : 0;
+      final index = rawIndex < 0 ? 0 : rawIndex; // Normalize negative indices
       return RouteContext(
         type: RouteType.profile,
         npub: npub,
@@ -61,8 +65,9 @@ RouteContext parseRoute(String path) {
       if (segments.length < 2) {
         return const RouteContext(type: RouteType.home, videoIndex: 0);
       }
-      final tag = segments[1];
-      final index = segments.length > 2 ? int.tryParse(segments[2]) ?? 0 : 0;
+      final tag = Uri.decodeComponent(segments[1]); // Decode URL encoding
+      final rawIndex = segments.length > 2 ? int.tryParse(segments[2]) ?? 0 : 0;
+      final index = rawIndex < 0 ? 0 : rawIndex; // Normalize negative indices
       return RouteContext(
         type: RouteType.hashtag,
         hashtag: tag,
@@ -81,24 +86,29 @@ RouteContext parseRoute(String path) {
 }
 
 /// Build a URL path from a RouteContext
+/// Encodes dynamic parameters and normalizes indices to >= 0
 String buildRoute(RouteContext context) {
   switch (context.type) {
     case RouteType.home:
-      final index = context.videoIndex ?? 0;
+      final rawIndex = context.videoIndex ?? 0;
+      final index = rawIndex < 0 ? 0 : rawIndex; // Normalize negative indices
       return '/home/$index';
 
     case RouteType.explore:
-      final index = context.videoIndex ?? 0;
+      final rawIndex = context.videoIndex ?? 0;
+      final index = rawIndex < 0 ? 0 : rawIndex; // Normalize negative indices
       return '/explore/$index';
 
     case RouteType.profile:
-      final npub = context.npub ?? '';
-      final index = context.videoIndex ?? 0;
+      final npub = Uri.encodeComponent(context.npub ?? ''); // Encode URL
+      final rawIndex = context.videoIndex ?? 0;
+      final index = rawIndex < 0 ? 0 : rawIndex; // Normalize negative indices
       return '/profile/$npub/$index';
 
     case RouteType.hashtag:
-      final hashtag = context.hashtag ?? '';
-      final index = context.videoIndex ?? 0;
+      final hashtag = Uri.encodeComponent(context.hashtag ?? ''); // Encode URL
+      final rawIndex = context.videoIndex ?? 0;
+      final index = rawIndex < 0 ? 0 : rawIndex; // Normalize negative indices
       return '/hashtag/$hashtag/$index';
 
     case RouteType.camera:
