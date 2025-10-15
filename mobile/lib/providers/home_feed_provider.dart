@@ -15,20 +15,28 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'home_feed_provider.g.dart';
 
+/// Auto-refresh interval for home feed (10 minutes in production, overridable in tests)
+@Riverpod(keepAlive: true)
+Duration homeFeedPollInterval(Ref ref) => const Duration(minutes: 10);
+
 /// Home feed provider - shows videos only from people you follow
-/// keepAlive: true ensures videos persist across tab switches and rebuilds
 ///
 /// Rebuilds occur when:
 /// - Contact list changes (follow/unfollow)
-/// - 10 minutes have passed since last refresh
+/// - Poll interval elapses (default 10 minutes, injectable via homeFeedPollIntervalProvider)
 /// - User pulls to refresh
-@Riverpod(keepAlive: true)
+///
+/// Timer lifecycle:
+/// - Starts when provider is first watched
+/// - Pauses when all listeners detach (ref.onCancel)
+/// - Resumes when a new listener attaches (ref.onResume)
+/// - Cancels on dispose
+@Riverpod(keepAlive: false) // Auto-dispose when no listeners
 class HomeFeed extends _$HomeFeed {
   Timer? _profileFetchTimer;
   Timer? _autoRefreshTimer;
   static int _buildCounter = 0;
   static DateTime? _lastBuildTime;
-  static const _autoRefreshInterval = Duration(minutes: 10);
 
   @override
   Future<VideoFeedState> build() async {
@@ -57,23 +65,50 @@ class HomeFeed extends _$HomeFeed {
 
     _lastBuildTime = now;
 
+    // Get injectable poll interval (overridable in tests)
+    final pollInterval = ref.read(homeFeedPollIntervalProvider);
+
+    // Timer lifecycle management
+    void startAutoRefresh() {
+      _autoRefreshTimer?.cancel();
+      _autoRefreshTimer = Timer(pollInterval, () {
+        Log.info(
+          '🏠 HomeFeed: Auto-refresh triggered after ${pollInterval.inMinutes} minutes',
+          name: 'HomeFeedProvider',
+          category: LogCategory.video,
+        );
+        if (ref.mounted) {
+          ref.invalidateSelf();
+        }
+      });
+    }
+
+    void stopAutoRefresh() {
+      _autoRefreshTimer?.cancel();
+      _autoRefreshTimer = null;
+    }
+
+    // Start timer when provider is first watched or resumed
+    ref.onResume(() {
+      Log.debug('🏠 HomeFeed: Resuming auto-refresh timer', name: 'HomeFeedProvider', category: LogCategory.video);
+      startAutoRefresh();
+    });
+
+    // Pause timer when all listeners detach
+    ref.onCancel(() {
+      Log.debug('🏠 HomeFeed: Pausing auto-refresh timer (no listeners)', name: 'HomeFeedProvider', category: LogCategory.video);
+      stopAutoRefresh();
+    });
+
     // Clean up timers on dispose
     ref.onDispose(() {
       Log.info('🏠 HomeFeed: BUILD #$buildId DISPOSED', name: 'HomeFeedProvider', category: LogCategory.video);
+      stopAutoRefresh();
       _profileFetchTimer?.cancel();
-      _autoRefreshTimer?.cancel();
     });
 
-    // Set up auto-refresh timer (10 minutes)
-    _autoRefreshTimer?.cancel();
-    _autoRefreshTimer = Timer(_autoRefreshInterval, () {
-      Log.info(
-        '🏠 HomeFeed: Auto-refresh triggered after ${_autoRefreshInterval.inMinutes} minutes',
-        name: 'HomeFeedProvider',
-        category: LogCategory.video,
-      );
-      ref.invalidateSelf();
-    });
+    // Start timer immediately for first build
+    startAutoRefresh();
 
     // Listen for changes to following list and invalidate when it changes
     ref.listen(social.socialProvider, (previous, next) {

@@ -8,40 +8,102 @@ part of 'home_feed_provider.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// Auto-refresh interval for home feed (10 minutes in production, overridable in tests)
+
+@ProviderFor(homeFeedPollInterval)
+const homeFeedPollIntervalProvider = HomeFeedPollIntervalProvider._();
+
+/// Auto-refresh interval for home feed (10 minutes in production, overridable in tests)
+
+final class HomeFeedPollIntervalProvider
+    extends $FunctionalProvider<Duration, Duration, Duration>
+    with $Provider<Duration> {
+  /// Auto-refresh interval for home feed (10 minutes in production, overridable in tests)
+  const HomeFeedPollIntervalProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'homeFeedPollIntervalProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$homeFeedPollIntervalHash();
+
+  @$internal
+  @override
+  $ProviderElement<Duration> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Duration create(Ref ref) {
+    return homeFeedPollInterval(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Duration value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Duration>(value),
+    );
+  }
+}
+
+String _$homeFeedPollIntervalHash() =>
+    r'6c71046a4cb805ce77cc4fd5138b9ab4ebf9d2f3';
+
 /// Home feed provider - shows videos only from people you follow
-/// keepAlive: true ensures videos persist across tab switches and rebuilds
 ///
 /// Rebuilds occur when:
 /// - Contact list changes (follow/unfollow)
-/// - 10 minutes have passed since last refresh
+/// - Poll interval elapses (default 10 minutes, injectable via homeFeedPollIntervalProvider)
 /// - User pulls to refresh
+///
+/// Timer lifecycle:
+/// - Starts when provider is first watched
+/// - Pauses when all listeners detach (ref.onCancel)
+/// - Resumes when a new listener attaches (ref.onResume)
+/// - Cancels on dispose
 
 @ProviderFor(HomeFeed)
 const homeFeedProvider = HomeFeedProvider._();
 
 /// Home feed provider - shows videos only from people you follow
-/// keepAlive: true ensures videos persist across tab switches and rebuilds
 ///
 /// Rebuilds occur when:
 /// - Contact list changes (follow/unfollow)
-/// - 10 minutes have passed since last refresh
+/// - Poll interval elapses (default 10 minutes, injectable via homeFeedPollIntervalProvider)
 /// - User pulls to refresh
+///
+/// Timer lifecycle:
+/// - Starts when provider is first watched
+/// - Pauses when all listeners detach (ref.onCancel)
+/// - Resumes when a new listener attaches (ref.onResume)
+/// - Cancels on dispose
 final class HomeFeedProvider
     extends $AsyncNotifierProvider<HomeFeed, VideoFeedState> {
   /// Home feed provider - shows videos only from people you follow
-  /// keepAlive: true ensures videos persist across tab switches and rebuilds
   ///
   /// Rebuilds occur when:
   /// - Contact list changes (follow/unfollow)
-  /// - 10 minutes have passed since last refresh
+  /// - Poll interval elapses (default 10 minutes, injectable via homeFeedPollIntervalProvider)
   /// - User pulls to refresh
+  ///
+  /// Timer lifecycle:
+  /// - Starts when provider is first watched
+  /// - Pauses when all listeners detach (ref.onCancel)
+  /// - Resumes when a new listener attaches (ref.onResume)
+  /// - Cancels on dispose
   const HomeFeedProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
         name: r'homeFeedProvider',
-        isAutoDispose: false,
+        isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -54,15 +116,20 @@ final class HomeFeedProvider
   HomeFeed create() => HomeFeed();
 }
 
-String _$homeFeedHash() => r'0321bbbe7d72d313234ed6575118155f14ee96dc';
+String _$homeFeedHash() => r'3f913869c30b8106a7bb6ee5d268399a27d0db0d';
 
 /// Home feed provider - shows videos only from people you follow
-/// keepAlive: true ensures videos persist across tab switches and rebuilds
 ///
 /// Rebuilds occur when:
 /// - Contact list changes (follow/unfollow)
-/// - 10 minutes have passed since last refresh
+/// - Poll interval elapses (default 10 minutes, injectable via homeFeedPollIntervalProvider)
 /// - User pulls to refresh
+///
+/// Timer lifecycle:
+/// - Starts when provider is first watched
+/// - Pauses when all listeners detach (ref.onCancel)
+/// - Resumes when a new listener attaches (ref.onResume)
+/// - Cancels on dispose
 
 abstract class _$HomeFeed extends $AsyncNotifier<VideoFeedState> {
   FutureOr<VideoFeedState> build();

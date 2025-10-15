@@ -6,8 +6,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openvine/router/app_router.dart';
 import 'package:openvine/router/route_normalization_provider.dart';
+import 'package:openvine/providers/home_feed_provider.dart';
 
 void main() {
+  // Disable HomeFeed timer in tests by setting poll interval to 1 year
+  final testOverrides = [
+    homeFeedPollIntervalProvider.overrideWithValue(const Duration(days: 365)),
+  ];
+
   Widget shell(ProviderContainer c) => UncontrolledProviderScope(
         container: c,
         child: MaterialApp.router(routerConfig: c.read(goRouterProvider)),
@@ -20,7 +26,7 @@ void main() {
 
   testWidgets('normalizes negative indices: /home/-3 -> /home/0',
       (tester) async {
-    final c = ProviderContainer();
+    final c = ProviderContainer(overrides: testOverrides);
     addTearDown(c.dispose);
 
     await tester.pumpWidget(shell(c));
@@ -34,16 +40,10 @@ void main() {
 
     // After normalization, router location should be canonical
     expect(currentLocation(c), '/home/0');
-
-    // Clean up pending timers from HomeFeed provider (it creates a new one each cycle)
-    for (var i = 0; i < 2; i++) {
-      await tester.binding.delayed(const Duration(minutes: 11));
-      await tester.pump();
-    }
   });
 
   testWidgets('normalizes unknown path -> /home/0', (tester) async {
-    final c = ProviderContainer();
+    final c = ProviderContainer(overrides: testOverrides);
     addTearDown(c.dispose);
 
     await tester.pumpWidget(shell(c));
@@ -55,16 +55,10 @@ void main() {
     await tester.pump(); // Process the post-frame callback redirect
 
     expect(currentLocation(c), '/home/0');
-
-    // Clean up pending timers from HomeFeed provider (it creates a new one each cycle)
-    for (var i = 0; i < 2; i++) {
-      await tester.binding.delayed(const Duration(minutes: 11));
-      await tester.pump();
-    }
   });
 
   testWidgets('encodes hashtag param consistently', (tester) async {
-    final c = ProviderContainer();
+    final c = ProviderContainer(overrides: testOverrides);
     addTearDown(c.dispose);
 
     await tester.pumpWidget(shell(c));
@@ -80,7 +74,7 @@ void main() {
   });
 
   testWidgets('normalizes profile with negative index', (tester) async {
-    final c = ProviderContainer();
+    final c = ProviderContainer(overrides: testOverrides);
     addTearDown(c.dispose);
 
     await tester.pumpWidget(shell(c));
@@ -95,7 +89,7 @@ void main() {
   });
 
   testWidgets('preserves valid canonical URLs unchanged', (tester) async {
-    final c = ProviderContainer();
+    final c = ProviderContainer(overrides: testOverrides);
     addTearDown(c.dispose);
 
     await tester.pumpWidget(shell(c));
@@ -107,11 +101,5 @@ void main() {
     await tester.pump(); // Process the post-frame callback redirect
 
     expect(currentLocation(c), '/home/5');
-
-    // Clean up pending timers from HomeFeed provider (it creates a new one each cycle)
-    for (var i = 0; i < 2; i++) {
-      await tester.binding.delayed(const Duration(minutes: 11));
-      await tester.pump();
-    }
   });
 }
