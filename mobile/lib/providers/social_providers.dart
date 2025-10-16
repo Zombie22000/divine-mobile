@@ -167,12 +167,6 @@ class SocialNotifier extends _$SocialNotifier {
       Log.info('🚀 SocialNotifier: Starting contact fetch...',
           name: 'SocialNotifier', category: LogCategory.system);
 
-      // Step 7: Temporary verification log
-      Log.info(
-          '🔍 [TEMP] Auth status at fetch time: ${authService.authState.name}, pubkey: ${authService.currentPublicKeyHex?.substring(0, 8) ?? 'null'}',
-          name: 'SocialNotifier',
-          category: LogCategory.system);
-
       Log.info(
           '🤝 SocialNotifier: Fetching contact list for authenticated user (cached: ${state.followingPubkeys.length} users)',
           name: 'SocialNotifier',
