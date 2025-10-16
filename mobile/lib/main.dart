@@ -242,11 +242,71 @@ void main() {
   });
 }
 
-class DivineApp extends ConsumerWidget {
+class DivineApp extends ConsumerStatefulWidget {
   const DivineApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DivineApp> createState() => _DivineAppState();
+}
+
+class _DivineAppState extends ConsumerState<DivineApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Trigger service initialization on first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeServices();
+    });
+  }
+
+  Future<void> _initializeServices() async {
+    try {
+      Log.info('[INIT] Starting service initialization...',
+          name: 'Main', category: LogCategory.system);
+
+      // Initialize auth service
+      await ref.read(authServiceProvider).initialize();
+      Log.info('[INIT] ✅ AuthService initialized',
+          name: 'Main', category: LogCategory.system);
+
+      // Initialize Nostr service - THIS IS THE CRITICAL MISSING PIECE
+      await ref.read(nostrServiceProvider).initialize();
+      Log.info('[INIT] ✅ NostrService initialized',
+          name: 'Main', category: LogCategory.system);
+
+      // Initialize other services
+      await ref.read(seenVideosServiceProvider).initialize();
+      Log.info('[INIT] ✅ SeenVideosService initialized',
+          name: 'Main', category: LogCategory.system);
+
+      await ref.read(uploadManagerProvider).initialize();
+      Log.info('[INIT] ✅ UploadManager initialized',
+          name: 'Main', category: LogCategory.system);
+
+      // Initialize social provider in background
+      Future.microtask(() async {
+        try {
+          await ref.read(social_providers.socialProvider.notifier).initialize();
+          Log.info('[INIT] ✅ SocialProvider initialized (background)',
+              name: 'Main', category: LogCategory.system);
+        } catch (e) {
+          Log.warning('[INIT] SocialProvider failed (non-critical): $e',
+              name: 'Main', category: LogCategory.system);
+        }
+      });
+
+      Log.info('[INIT] ✅ All critical services initialized',
+          name: 'Main', category: LogCategory.system);
+    } catch (e, stack) {
+      Log.error('[INIT] Service initialization failed: $e',
+          name: 'Main', category: LogCategory.system);
+      Log.verbose('[INIT] Stack: $stack',
+          name: 'Main', category: LogCategory.system);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Activate route normalization at app root
     ref.watch(routeNormalizationProvider);
 

@@ -956,9 +956,6 @@ class _UniversalCameraScreenPureState extends ConsumerState<UniversalCameraScree
           videoManager.disposeAllControllers();
           Log.info('🗑️ Disposed controllers before profile navigation', category: LogCategory.video);
 
-          // Pop the camera screen
-          Navigator.of(context).pop();
-
           // Navigate to user's own profile using GoRouter
           context.go('/profile/me/0');
           Log.info('📹 Successfully navigated to profile', category: LogCategory.video);

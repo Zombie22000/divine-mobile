@@ -317,9 +317,11 @@ class VideoEventService extends ChangeNotifier {
     if (!_nostrService.isInitialized) {
       _isLoading = false;
 
-      Log.error('Cannot subscribe - Nostr service not initialized',
+      Log.warning('Cannot subscribe - Nostr service not initialized (will retry when ready)',
           name: 'VideoEventService', category: LogCategory.video);
-      throw const VideoEventServiceException('Nostr service not initialized');
+      // Defensive: Don't throw, just return early
+      // The provider will retry when the service becomes initialized
+      return;
     }
 
     // Check connection status
@@ -1151,7 +1153,9 @@ class VideoEventService extends ChangeNotifier {
     int limit = 200,
   }) async {
     if (!_nostrService.isInitialized) {
-      throw const VideoEventServiceException('Nostr service not initialized');
+      Log.warning('Cannot subscribe to group - Nostr service not initialized (will retry when ready)',
+          name: 'VideoEventService', category: LogCategory.video);
+      return; // Defensive: Don't throw, just return early
     }
 
     Log.verbose('Subscribing to videos from group: $group',
@@ -1335,7 +1339,9 @@ class VideoEventService extends ChangeNotifier {
       int? until,
       int limit = 500}) async {
     if (!_nostrService.isInitialized) {
-      throw const VideoEventServiceException('Nostr service not initialized');
+      Log.warning('Cannot query historical events - Nostr service not initialized',
+          name: 'VideoEventService', category: LogCategory.video);
+      return; // Defensive: Don't throw, just return early
     }
 
     // Get current subscription parameters to maintain consistency
@@ -1554,7 +1560,9 @@ class VideoEventService extends ChangeNotifier {
   /// Query video events by vine ID from relays
   Future<VideoEvent?> queryVideoByVineId(String vineId) async {
     if (!_nostrService.isInitialized) {
-      throw const VideoEventServiceException('Nostr service not initialized');
+      Log.warning('Cannot query video by ID - Nostr service not initialized',
+          name: 'VideoEventService', category: LogCategory.video);
+      return null; // Defensive: Don't throw, just return null
     }
 
     Log.debug('Querying for video with vine ID: $vineId',

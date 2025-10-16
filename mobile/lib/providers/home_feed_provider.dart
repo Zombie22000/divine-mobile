@@ -125,11 +125,12 @@ class HomeFeed extends _$HomeFeed {
       }
     });
 
-    Log.info('🏠 HomeFeed: BUILD #$buildId reading socialProvider (one-time read)...', name: 'HomeFeedProvider', category: LogCategory.video);
+    Log.info('🏠 HomeFeed: BUILD #$buildId watching socialProvider for current state...', name: 'HomeFeedProvider', category: LogCategory.video);
 
-    // Read social data once without creating reactive dependency
-    // Using ref.read() instead of ref.watch() prevents rebuilds when social state changes
-    final socialData = ref.read(social.socialProvider);
+    // Watch social provider to ensure we have initialized data
+    // This creates a dependency that will rebuild when social state changes
+    // Note: ref.listen() above handles invalidation when following list changes
+    final socialData = ref.watch(social.socialProvider);
     final followingPubkeys = socialData.followingPubkeys;
 
     Log.info(

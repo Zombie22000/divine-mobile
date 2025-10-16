@@ -4,7 +4,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openvine/models/video_event.dart';
-import 'package:openvine/providers/individual_video_providers.dart';
 import 'package:openvine/widgets/video_page_view.dart';
 import 'package:openvine/utils/unified_logger.dart';
 
@@ -29,17 +28,10 @@ class ExploreVideoScreenPure extends ConsumerStatefulWidget {
 
 class _ExploreVideoScreenPureState extends ConsumerState<ExploreVideoScreenPure> {
   late int _initialIndex;
-  ActiveVideoNotifier? _activeVideoNotifier; // Save notifier for safe disposal
-  String? _activeVideoIdAtInit; // Save active video ID for logging
 
   @override
   void initState() {
     super.initState();
-
-    // Save notifier reference for safe disposal
-    // CRITICAL: Must do this before any async work
-    _activeVideoNotifier = ref.read(activeVideoProvider.notifier);
-    _activeVideoIdAtInit = ref.read(activeVideoProvider).currentVideoId;
 
     // Find starting video index or use provided index
     _initialIndex = widget.startingIndex ??
@@ -55,22 +47,9 @@ class _ExploreVideoScreenPureState extends ConsumerState<ExploreVideoScreenPure>
 
   @override
   void dispose() {
-    // CRITICAL: Clear active video when leaving to stop playback
-    // Use saved notifier reference - NEVER use ref.read() in dispose()
-    if (_activeVideoNotifier != null) {
-      try {
-        Log.info('🛑 ExploreVideoScreenPure disposing - clearing active video: ${_activeVideoIdAtInit != null ? _activeVideoIdAtInit!.substring(0, 8) : "none"}',
-            name: 'ExploreVideoScreen', category: LogCategory.video);
-
-        _activeVideoNotifier!.clearActiveVideo();
-
-        Log.info('✅ Active video cleared successfully',
-            name: 'ExploreVideoScreen', category: LogCategory.video);
-      } catch (e) {
-        Log.error('❌ Error clearing active video on dispose: $e',
-            name: 'ExploreVideoScreen', category: LogCategory.video);
-      }
-    }
+    // Router-driven state - no manual cleanup needed, URL navigation handles it
+    Log.info('🛑 ExploreVideoScreenPure disposing - router handles state cleanup',
+        name: 'ExploreVideoScreen', category: LogCategory.video);
     super.dispose();
   }
 

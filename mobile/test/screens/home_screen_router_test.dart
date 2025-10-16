@@ -218,9 +218,9 @@ void main() {
       // Verify HomeScreenRouter is rendered
       expect(find.byType(HomeScreenRouter), findsOneWidget);
 
-      // Verify empty state is shown
-      expect(find.byType(HomeEmptyState), findsOneWidget);
+      // Verify empty state is shown (inline widget, no specific type)
       expect(find.text('No videos available'), findsOneWidget);
+      expect(find.text('Follow some creators to see their videos here'), findsOneWidget);
     });
 
     testWidgets('pull-to-refresh triggers refresh', (tester) async {

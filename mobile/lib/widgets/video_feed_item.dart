@@ -6,7 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import 'package:video_player/video_player.dart';
 import 'package:openvine/models/video_event.dart';
-import 'package:openvine/providers/individual_video_providers.dart';
+import 'package:openvine/providers/individual_video_providers.dart' hide isVideoActiveProvider; // For individualVideoControllerProvider only
+import 'package:openvine/providers/active_video_provider.dart'; // For isVideoActiveProvider (derived)
 import 'package:openvine/providers/social_providers.dart';
 import 'package:openvine/providers/user_profile_providers.dart';
 import 'package:openvine/screens/comments_screen.dart';
@@ -45,7 +46,6 @@ class VideoFeedItem extends ConsumerStatefulWidget {
 
 class _VideoFeedItemState extends ConsumerState<VideoFeedItem> {
   int _playbackGeneration = 0; // Prevents race conditions with rapid state changes
-  ActiveVideoNotifier? _activeVideoNotifier; // Cached for use in dispose()
   DateTime? _lastTapTime; // Debounce rapid taps to prevent phantom pauses
 
   /// Translate error messages to user-friendly text
@@ -77,11 +77,8 @@ class _VideoFeedItemState extends ConsumerState<VideoFeedItem> {
   void initState() {
     super.initState();
 
-    // Cache the active video notifier for use in dispose()
-    _activeVideoNotifier = ref.read(activeVideoProvider.notifier);
-
     // Listen for active state changes to control playback
-    // Widget is responsible for play/pause, NOT the provider
+    // Active state is now derived from URL + feed + foreground (pure provider)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final videoIdDisplay = widget.video.id.length > 8 ? widget.video.id.substring(0, 8) : widget.video.id;
       // Check initial state and start playback if already active
@@ -104,43 +101,7 @@ class _VideoFeedItemState extends ConsumerState<VideoFeedItem> {
     });
   }
 
-  @override
-  void dispose() {
-    // CRITICAL: Only clear active video if THIS video is still the active one
-    // This prevents clearing active video when a new video has already taken over
-    final videoIdDisplay = widget.video.id.length > 8 ? widget.video.id.substring(0, 8) : widget.video.id;
-
-    // Check if this video is still active before clearing
-    // Use cached notifier to avoid ref.read() during dispose
-    if (_activeVideoNotifier != null) {
-      final currentActiveId = _activeVideoNotifier!.currentVideoId;
-      if (currentActiveId == widget.video.id) {
-        // Use Future() to delay state modification until after widget tree is done building
-        Future(() {
-          try {
-            // Double-check it's still active (another video might have become active in the meantime)
-            final stillActive = _activeVideoNotifier!.currentVideoId == widget.video.id;
-            if (stillActive) {
-              Log.info('🔄 Clearing active video $videoIdDisplay... on widget dispose',
-                  name: 'VideoFeedItem', category: LogCategory.ui);
-              _activeVideoNotifier!.clearActiveVideo();
-            } else {
-              Log.debug('⏭️ Skipping clear - video $videoIdDisplay... no longer active',
-                  name: 'VideoFeedItem', category: LogCategory.ui);
-            }
-          } catch (e) {
-            Log.error('❌ Error clearing active video on dispose: $e',
-                name: 'VideoFeedItem', category: LogCategory.ui);
-          }
-        });
-      } else {
-        Log.debug('⏭️ Skipping clear - video $videoIdDisplay... was not active (current: ${currentActiveId != null && currentActiveId.length > 8 ? currentActiveId.substring(0, 8) : currentActiveId ?? 'none'})',
-            name: 'VideoFeedItem', category: LogCategory.ui);
-      }
-    }
-
-    super.dispose();
-  }
+  // No dispose needed - derived provider handles state automatically
 
   /// Handle playback state changes with generation counter to prevent race conditions
   void _handlePlaybackChange(bool shouldPlay) {
@@ -316,10 +277,12 @@ class _VideoFeedItemState extends ConsumerState<VideoFeedItem> {
                     name: 'VideoFeedItem', category: LogCategory.ui);
               }
             } else {
-              // Make this video active when tapped
-              Log.info('🎯 Tap activating video $videoIdDisplay...',
+              // Tapping inactive video: Navigate to this video's index
+              // Active state is derived from URL, so navigation will update it
+              Log.info('🎯 Tap navigating to video $videoIdDisplay... at index ${widget.index}',
                   name: 'VideoFeedItem', category: LogCategory.ui);
-              ref.read(activeVideoProvider.notifier).setActiveVideo(video.id);
+              // TODO: Navigate to this video's index using GoRouter
+              // For now, do nothing - PageView scroll will handle activation
             }
             widget.onTap?.call();
           } catch (e) {

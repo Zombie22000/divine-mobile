@@ -4,12 +4,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:openvine/models/video_event.dart';
 import 'package:openvine/providers/home_screen_controllers.dart';
 import 'package:openvine/providers/route_feed_providers.dart';
 import 'package:openvine/providers/user_profile_providers.dart';
 import 'package:openvine/router/page_context_provider.dart';
 import 'package:openvine/router/route_utils.dart';
+import 'package:openvine/widgets/video_page_view.dart';
 
 /// Router-driven HomeScreen - PageView syncs with URL bidirectionally
 class HomeScreenRouter extends ConsumerStatefulWidget {
@@ -52,7 +52,25 @@ class _HomeScreenRouterState extends ConsumerState<HomeScreenRouter> {
             final videos = state.videos;
 
             if (videos.isEmpty) {
-              return const HomeEmptyState();
+              return const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.video_library_outlined, size: 64, color: Colors.grey),
+                    SizedBox(height: 16),
+                    Text(
+                      'No videos available',
+                      style: TextStyle(fontSize: 18, color: Colors.grey),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Follow some creators to see their videos here',
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
             }
 
             final itemCount = videos.length;
@@ -106,10 +124,18 @@ class _HomeScreenRouterState extends ConsumerState<HomeScreenRouter> {
 
             return RefreshIndicator(
               onRefresh: () => ref.read(homeRefreshControllerProvider).refresh(),
-              child: PageView.builder(
+              child: VideoPageView(
+                key: const Key('home-video-page-view'),
+                videos: videos,
                 controller: _controller,
-                itemCount: itemCount,
-                onPageChanged: (newIndex) {
+                initialIndex: _lastUrlIndex ?? 0,
+                hasBottomNavigation: true,
+                enablePrewarming: true,
+                enablePreloading: true,
+                enableLifecycleManagement: true,
+                tabIndex: 0, // Home feed is tab 0
+                screenId: 'home',
+                onPageChanged: (newIndex, video) {
                   // Guard: only navigate if URL doesn't match
                   if (newIndex != urlIndex) {
                     context.go(buildRoute(
@@ -122,14 +148,7 @@ class _HomeScreenRouterState extends ConsumerState<HomeScreenRouter> {
                     ref.read(homePaginationControllerProvider).maybeLoadMore();
                   }
                 },
-                itemBuilder: (context, index) {
-                  final video = videos[index];
-                  return VideoCell(
-                    video: video,
-                    index: index,
-                    total: videos.length,
-                  );
-                },
+                onRefresh: () => ref.read(homeRefreshControllerProvider).refresh(),
               ),
             );
           },
@@ -141,65 +160,6 @@ class _HomeScreenRouterState extends ConsumerState<HomeScreenRouter> {
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, stack) => Center(child: Text('Error: $error')),
-    );
-  }
-}
-
-/// Minimal video cell for displaying video in tests
-class VideoCell extends StatelessWidget {
-  const VideoCell({
-    required this.video,
-    required this.index,
-    required this.total,
-    super.key,
-  });
-
-  final VideoEvent video;
-  final int index;
-  final int total;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            '${video.title}/$total',
-            style: const TextStyle(fontSize: 24),
-          ),
-          const SizedBox(height: 16),
-          Text('ID: ${video.id}'),
-        ],
-      ),
-    );
-  }
-}
-
-/// Empty state widget shown when home feed has no videos
-class HomeEmptyState extends StatelessWidget {
-  const HomeEmptyState({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.video_library_outlined, size: 64, color: Colors.grey),
-          SizedBox(height: 16),
-          Text(
-            'No videos available',
-            style: TextStyle(fontSize: 18, color: Colors.grey),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Follow some creators to see their videos here',
-            style: TextStyle(fontSize: 14, color: Colors.grey),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
     );
   }
 }

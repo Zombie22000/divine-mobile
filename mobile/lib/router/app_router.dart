@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:openvine/router/app_shell.dart';
-import 'package:openvine/screens/explore_screen_router.dart';
-import 'package:openvine/screens/hashtag_screen_router.dart';
+import 'package:openvine/screens/explore_screen.dart';
+import 'package:openvine/screens/hashtag_feed_screen.dart';
 import 'package:openvine/screens/home_screen_router.dart';
-import 'package:openvine/screens/profile_screen_router.dart';
+import 'package:openvine/screens/profile_screen_scrollable.dart';
 import 'package:openvine/screens/pure/universal_camera_screen_pure.dart';
 import 'package:openvine/screens/settings_screen.dart';
 
@@ -37,22 +37,6 @@ int tabIndexFromLocation(String loc) {
   }
 }
 
-/// Returns canonical base path for a given tab index
-String basePathForTab(int index) {
-  switch (index) {
-    case 0:
-      return '/home/0';
-    case 1:
-      return '/explore/0';
-    case 2:
-      return '/hashtag/trending/0'; // default hashtag
-    case 3:
-      return '/profile/me/0'; // default to own profile
-    default:
-      return '/home/0';
-  }
-}
-
 final goRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: _rootKey,
@@ -65,10 +49,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           final current = tabIndexFromLocation(location);
           return AppShell(
             currentIndex: current,
-            onTap: (i) {
-              final base = basePathForTab(i);
-              if (base != location) context.go(base);
-            },
             child: child,
           );
         },
@@ -98,7 +78,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               child: Navigator(
                 key: _exploreKey,
                 onGenerateRoute: (r) => MaterialPageRoute(
-                  builder: (_) => const ExploreScreenRouter(),
+                  builder: (_) => const ExploreScreen(),
                   settings: const RouteSettings(name: 'explore-root'),
                 ),
               ),
@@ -109,32 +89,40 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/hashtag/:tag/:index',
             name: 'hashtag',
-            pageBuilder: (ctx, st) => NoTransitionPage(
-              key: st.pageKey,
-              child: Navigator(
-                key: _hashtagKey,
-                onGenerateRoute: (r) => MaterialPageRoute(
-                  builder: (_) => const HashtagScreenRouter(),
-                  settings: const RouteSettings(name: 'hashtag-root'),
+            pageBuilder: (ctx, st) {
+              final tag = st.pathParameters['tag'] ?? 'trending';
+              return NoTransitionPage(
+                key: st.pageKey,
+                child: Navigator(
+                  key: _hashtagKey,
+                  onGenerateRoute: (r) => MaterialPageRoute(
+                    builder: (_) => HashtagFeedScreen(hashtag: tag),
+                    settings: const RouteSettings(name: 'hashtag-root'),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
 
           // PROFILE tab subtree
           GoRoute(
             path: '/profile/:npub/:index',
             name: 'profile',
-            pageBuilder: (ctx, st) => NoTransitionPage(
-              key: st.pageKey,
-              child: Navigator(
-                key: _profileKey,
-                onGenerateRoute: (r) => MaterialPageRoute(
-                  builder: (_) => const ProfileScreenRouter(),
-                  settings: const RouteSettings(name: 'profile-root'),
+            pageBuilder: (ctx, st) {
+              final npub = st.pathParameters['npub'];
+              // "me" means current user, pass null to ProfileScreenScrollable
+              final profilePubkey = (npub == 'me' || npub == null) ? null : npub;
+              return NoTransitionPage(
+                key: st.pageKey,
+                child: Navigator(
+                  key: _profileKey,
+                  onGenerateRoute: (r) => MaterialPageRoute(
+                    builder: (_) => ProfileScreenScrollable(profilePubkey: profilePubkey),
+                    settings: const RouteSettings(name: 'profile-root'),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ],
       ),

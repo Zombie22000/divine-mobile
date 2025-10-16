@@ -6,6 +6,8 @@ import 'dart:async';
 import 'package:openvine/models/video_event.dart';
 import 'package:openvine/providers/app_providers.dart';
 import 'package:openvine/providers/seen_videos_notifier.dart';
+import 'package:openvine/state/seen_videos_state.dart';
+import 'package:openvine/providers/readiness_gate_providers.dart';
 import 'package:openvine/services/nostr_service_interface.dart';
 import 'package:openvine/services/subscription_manager.dart';
 import 'package:openvine/services/video_event_service.dart';
@@ -35,138 +37,193 @@ class VideoEvents extends _$VideoEvents {
   StreamController<List<VideoEvent>>? _controller;
   Timer? _debounceTimer;
   List<VideoEvent>? _pendingEvents;
+  bool _isSubscribed = false;
   bool get _canEmit => _controller != null && !(_controller!.isClosed);
 
   @override
   Stream<List<VideoEvent>> build() {
-    // Use existing VideoEventService for discovery mode
+    // Get services and gate states
     final videoEventService = ref.watch(videoEventServiceProvider);
-    final isExploreActive = ref.watch(isExploreTabActiveProvider);
-
-    Log.info(
-      'VideoEvents: Provider built with reactive listening (${videoEventService.discoveryVideos.length} cached events)',
-      name: 'VideoEventsProvider',
-      category: LogCategory.video,
-    );
-
-    // Always subscribe when provider is watched - disposal handles cleanup
-    // Note: On web, IndexedStack pre-renders all tabs, so ExploreScreen widgets
-    // are built even when main tab is not active. This is expected behavior.
-    Log.debug('VideoEvents: Starting discovery subscription (tab active: $isExploreActive)',
-        name: 'VideoEventsProvider', category: LogCategory.video);
-
-    videoEventService.subscribeToDiscovery(limit: 100);
-
-    // Create a new stream controller
-    _controller = StreamController<List<VideoEvent>>.broadcast();
-
-    // Emit current events immediately from discovery list
-    final currentEvents =
-        List<VideoEvent>.from(videoEventService.discoveryVideos);
-
-    Log.info(
-      'VideoEvents: Initial emission - ${currentEvents.length} events from service',
-      name: 'VideoEventsProvider',
-      category: LogCategory.video,
-    );
-
-    // Reorder to show unseen videos first
+    final isAppReady = ref.watch(appReadyProvider);
+    final isTabActive = ref.watch(isDiscoveryTabActiveProvider);
     final seenVideosState = ref.watch(seenVideosProvider);
 
+    Log.info(
+      'VideoEvents: Provider built (appReady: $isAppReady, tabActive: $isTabActive, cached: ${videoEventService.discoveryVideos.length})',
+      name: 'VideoEventsProvider',
+      category: LogCategory.video,
+    );
+
+    // Create stream controller
+    _controller = StreamController<List<VideoEvent>>.broadcast();
+
+    // Defensive: Don't subscribe or throw if not ready - just return empty state
+    if (!isAppReady || !isTabActive) {
+      Log.info(
+        'VideoEvents: Not ready - returning empty (will retry when gates flip)',
+        name: 'VideoEventsProvider',
+        category: LogCategory.video,
+      );
+      // Emit empty list and return
+      Future.microtask(() {
+        if (_canEmit) {
+          _controller!.add(<VideoEvent>[]);
+        }
+      });
+
+      // Setup listeners to start subscription when ready
+      _setupGateListeners(videoEventService, seenVideosState);
+
+      // Clean up on dispose
+      ref.onDispose(() {
+        _debounceTimer?.cancel();
+        _controller?.close();
+        _controller = null;
+      });
+
+      return _controller!.stream;
+    }
+
+    // App is ready and tab is active - start subscription
+    _startSubscription(videoEventService, seenVideosState);
+
+    // Setup listeners for gate changes
+    _setupGateListeners(videoEventService, seenVideosState);
+
+    // Clean up on dispose
+    ref.onDispose(() {
+      _debounceTimer?.cancel();
+      videoEventService.removeListener(_onVideoEventServiceChange);
+      _controller?.close();
+      _controller = null;
+    });
+
+    return _controller!.stream;
+  }
+
+  /// Setup listeners on gate providers to start/stop subscription
+  void _setupGateListeners(VideoEventService service, SeenVideosState seenState) {
+    // Listen to app ready state changes
+    ref.listen<bool>(appReadyProvider, (prev, next) {
+      final tabActive = ref.read(isDiscoveryTabActiveProvider);
+      if (next && tabActive) {
+        Log.debug('VideoEvents: App ready gate flipped true - starting subscription',
+            name: 'VideoEventsProvider', category: LogCategory.video);
+        _startSubscription(service, seenState);
+      }
+      if (!next) {
+        Log.debug('VideoEvents: App ready gate flipped false - cleaning up',
+            name: 'VideoEventsProvider', category: LogCategory.video);
+        _stopSubscription(service);
+      }
+    });
+
+    // Listen to tab active state changes
+    ref.listen<bool>(isDiscoveryTabActiveProvider, (prev, next) {
+      final appReady = ref.read(appReadyProvider);
+      if (next && appReady) {
+        Log.debug('VideoEvents: Tab active gate flipped true - starting subscription',
+            name: 'VideoEventsProvider', category: LogCategory.video);
+        _startSubscription(service, seenState);
+      }
+      if (!next) {
+        Log.debug('VideoEvents: Tab active gate flipped false - cleaning up',
+            name: 'VideoEventsProvider', category: LogCategory.video);
+        _stopSubscription(service);
+      }
+    });
+  }
+
+  /// Start subscription and emit initial events
+  void _startSubscription(VideoEventService service, SeenVideosState seenState) {
+    // Skip if already subscribed
+    if (_isSubscribed) {
+      Log.debug('VideoEvents: Already subscribed - skipping',
+          name: 'VideoEventsProvider', category: LogCategory.video);
+      return;
+    }
+
+    Log.info('VideoEvents: Starting discovery subscription',
+        name: 'VideoEventsProvider', category: LogCategory.video);
+
+    // Subscribe to discovery videos (service is now defensive, won't throw)
+    service.subscribeToDiscovery(limit: 100);
+    _isSubscribed = true;
+
+    // Add listener for reactive updates
+    service.addListener(_onVideoEventServiceChange);
+
+    // Emit current events immediately
+    final currentEvents = List<VideoEvent>.from(service.discoveryVideos);
+    final reordered = _reorderBySeen(currentEvents, seenState);
+
+    Future.microtask(() {
+      if (_canEmit) {
+        _controller!.add(reordered);
+        Log.info(
+          'VideoEvents: ✅ Emitted ${reordered.length} events to stream',
+          name: 'VideoEventsProvider',
+          category: LogCategory.video,
+        );
+      }
+    });
+  }
+
+  /// Stop subscription and remove listeners
+  void _stopSubscription(VideoEventService service) {
+    if (!_isSubscribed) return;
+
+    Log.info('VideoEvents: Stopping discovery subscription',
+        name: 'VideoEventsProvider', category: LogCategory.video);
+
+    service.removeListener(_onVideoEventServiceChange);
+    _isSubscribed = false;
+    // Don't unsubscribe from service - keep videos cached
+  }
+
+  /// Listener callback for service changes
+  void _onVideoEventServiceChange() {
+    final service = ref.read(videoEventServiceProvider);
+    final seenState = ref.read(seenVideosProvider);
+    final newEvents = List<VideoEvent>.from(service.discoveryVideos);
+    final reordered = _reorderBySeen(newEvents, seenState);
+
+    // Store pending events for debounced emission
+    _pendingEvents = reordered;
+
+    // Cancel any existing timer
+    _debounceTimer?.cancel();
+
+    // Create a new debounce timer to batch updates
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      if (_pendingEvents != null && _canEmit) {
+        Log.debug(
+          '📺 VideoEvents: Batched update - ${_pendingEvents!.length} discovery videos',
+          name: 'VideoEventsProvider',
+          category: LogCategory.video,
+        );
+        _controller!.add(_pendingEvents!);
+        _pendingEvents = null;
+      }
+    });
+  }
+
+  /// Reorder events to show unseen first
+  List<VideoEvent> _reorderBySeen(List<VideoEvent> events, SeenVideosState seenState) {
     final unseen = <VideoEvent>[];
     final seen = <VideoEvent>[];
 
-    for (final video in currentEvents) {
-      if (seenVideosState.seenVideoIds.contains(video.id)) {
+    for (final video in events) {
+      if (seenState.seenVideoIds.contains(video.id)) {
         seen.add(video);
       } else {
         unseen.add(video);
       }
     }
 
-    final reorderedEvents = [...unseen, ...seen];
-
-    Log.info(
-      'VideoEvents: Reordered for emission - ${reorderedEvents.length} total (${unseen.length} unseen, ${seen.length} seen)',
-      name: 'VideoEventsProvider',
-      category: LogCategory.video,
-    );
-
-    // Emit after a microtask to ensure the stream has subscribers
-    // This is critical for broadcast streams - synchronous emission before subscription
-    // results in data loss when the provider rebuilds
-    Future.microtask(() {
-      if (_canEmit) {
-        _controller!.add(reorderedEvents);
-        Log.info(
-          'VideoEvents: ✅ Emitted ${reorderedEvents.length} events to stream',
-          name: 'VideoEventsProvider',
-          category: LogCategory.video,
-        );
-      } else {
-        Log.error(
-          'VideoEvents: ❌ Cannot emit - controller unavailable',
-          name: 'VideoEventsProvider',
-          category: LogCategory.video,
-        );
-      }
-    });
-
-    // Listen to VideoEventService changes reactively (proper Riverpod way)
-    void onVideoEventServiceChange() {
-      final newEvents =
-          List<VideoEvent>.from(videoEventService.discoveryVideos);
-
-      // Reorder to show unseen videos first
-      final unseenNew = <VideoEvent>[];
-      final seenNew = <VideoEvent>[];
-
-      for (final video in newEvents) {
-        if (seenVideosState.seenVideoIds.contains(video.id)) {
-          seenNew.add(video);
-        } else {
-          unseenNew.add(video);
-        }
-      }
-
-      final reorderedNew = [...unseenNew, ...seenNew];
-
-      // Store pending events for debounced emission
-      _pendingEvents = reorderedNew;
-
-      // Cancel any existing timer
-      _debounceTimer?.cancel();
-
-      // Create a new debounce timer to batch updates
-      _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-        if (_pendingEvents != null && _canEmit) {
-          Log.debug(
-            '📺 VideoEvents: Batched update - ${_pendingEvents!.length} discovery videos (${unseenNew.length} unseen, ${seenNew.length} seen)',
-            name: 'VideoEventsProvider',
-            category: LogCategory.video,
-          );
-          _controller!.add(_pendingEvents!);
-          _pendingEvents = null;
-        }
-      });
-    }
-
-    // Add listener for reactive updates
-    videoEventService.addListener(onVideoEventServiceChange);
-
-    // Clean up on dispose
-    ref.onDispose(() {
-      _debounceTimer?.cancel();
-      videoEventService.removeListener(onVideoEventServiceChange);
-      // Close and null out the controller to signal no further emits
-      _controller?.close();
-      _controller = null;
-      // Don't unsubscribe - keep the videos cached in the service
-      // The service will manage its own lifecycle
-    });
-
-    return _controller!.stream;
+    return [...unseen, ...seen];
   }
+
 
   /// Start discovery subscription when Explore tab is visible
   void startDiscoverySubscription() {

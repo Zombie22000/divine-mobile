@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openvine/models/video_event.dart';
 import 'package:openvine/providers/app_providers.dart';
-import 'package:openvine/providers/individual_video_providers.dart';
 import 'package:openvine/providers/video_events_providers.dart';
 import 'package:openvine/providers/tab_visibility_provider.dart';
+import 'package:openvine/router/nav_extensions.dart';
 import 'package:openvine/screens/pure/explore_video_screen_pure.dart';
 import 'package:openvine/screens/hashtag_feed_screen.dart';
 import 'package:openvine/services/top_hashtags_service.dart';
@@ -44,16 +44,15 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
     Log.info('🎯 ExploreScreenPure: Initialized with revolutionary architecture',
         category: LogCategory.video);
 
-    // Listen for tab changes - clear active video when tab becomes hidden
+    // Listen for tab changes - no need to clear active video (router-driven now)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.listenManual(
         tabVisibilityProvider,
         (prev, next) {
           if (next != 2) {
             // This tab (Explore = tab 2) is no longer visible
-            Log.info('🔄 Tab 2 (Explore) hidden, clearing active video',
+            Log.info('🔄 Tab 2 (Explore) hidden',
                 name: 'ExploreScreen', category: LogCategory.ui);
-            ref.read(activeVideoProvider.notifier).clearActiveVideo();
           }
         },
       );
@@ -127,12 +126,10 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
       _feedStartIndex = startIndex;
     });
 
-    // Set active video; feed screen manages playback based on visibility
-    if (startIndex >= 0 && startIndex < videos.length) {
-      ref.read(activeVideoProvider.notifier).setActiveVideo(videos[startIndex].id);
-    }
+    // Navigate to update URL - this triggers reactive video playback via router
+    context.goExplore(startIndex);
 
-    Log.info('🎯 ExploreScreenPure: Entered feed mode at index $startIndex',
+    Log.info('🎯 ExploreScreenPure: Entered feed mode at index $startIndex via URL navigation',
         category: LogCategory.video);
   }
 
@@ -144,10 +141,10 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
       _feedVideos = null;
     });
 
-    // Clear active video on exit
-    ref.read(activeVideoProvider.notifier).clearActiveVideo();
+    // Navigate back to grid mode - URL navigation handles state cleanup
+    context.goExplore(0);
 
-    Log.info('🎯 ExploreScreenPure: Exited feed mode',
+    Log.info('🎯 ExploreScreenPure: Exited feed mode via URL navigation',
         category: LogCategory.video);
   }
 

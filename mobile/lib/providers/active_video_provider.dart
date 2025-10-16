@@ -58,3 +58,10 @@ final activeVideoIdProvider = Provider<String?>((ref) {
   final idx = (ctx.videoIndex ?? 0).clamp(0, videos.length - 1);
   return videos[idx].id;
 });
+
+/// Per-video active state (for efficient VideoFeedItem updates)
+/// Returns true if the given videoId matches the current active video
+final isVideoActiveProvider = Provider.family<bool, String>((ref, videoId) {
+  final activeVideoId = ref.watch(activeVideoIdProvider);
+  return activeVideoId == videoId;
+});

@@ -6,6 +6,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:openvine/models/video_event.dart';
 import 'package:openvine/providers/home_feed_provider.dart';
 import 'package:openvine/providers/user_profile_providers.dart';
@@ -15,8 +16,6 @@ import 'package:openvine/theme/vine_theme.dart';
 import 'package:openvine/utils/unified_logger.dart';
 import 'package:openvine/widgets/video_page_view.dart';
 import 'package:openvine/state/video_feed_state.dart';
-import 'package:openvine/providers/individual_video_providers.dart';
-import 'package:openvine/providers/tab_visibility_provider.dart';
 
 /// Feed context for filtering videos
 enum FeedContext {
@@ -135,20 +134,8 @@ class _VideoFeedScreenState extends ConsumerState<VideoFeedScreen>
 
     // Feed mode removed - each screen manages its own content
 
-    // Listen for tab changes - clear active video when tab becomes hidden
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.listenManual(
-        tabVisibilityProvider,
-        (prev, next) {
-          if (next != 0) {
-            // This tab (Home = tab 0) is no longer visible
-            Log.info('🔄 Tab 0 (Home Feed) hidden, clearing active video',
-                name: 'VideoFeedScreen', category: LogCategory.ui);
-            ref.read(activeVideoProvider.notifier).clearActiveVideo();
-          }
-        },
-      );
-    });
+    // Tab visibility handled by derived provider - when tab changes, pageContextProvider updates
+    // which causes activeVideoIdProvider to recompute and return null for non-active tabs
   }
 
   @override
@@ -202,9 +189,9 @@ class _VideoFeedScreenState extends ConsumerState<VideoFeedScreen>
         }
 
       case AppLifecycleState.resumed:
-        Log.debug('📱 App resumed - resuming current video, state: $state',
+        Log.debug('📱 App resumed - derived provider will handle video resumption, state: $state',
             name: 'VideoFeedScreen', category: LogCategory.ui);
-        _resumeCurrentVideo();
+        // appForegroundProvider will update → activeVideoIdProvider recomputes → VideoFeedItem plays
 
       case AppLifecycleState.detached:
         Log.debug('📱 App detached - pausing videos, state: $state',
@@ -249,47 +236,17 @@ class _VideoFeedScreenState extends ConsumerState<VideoFeedScreen>
     // Batch fetch profiles for videos around current position
     _batchFetchProfilesAroundIndex(index, videos);
 
-    // Update video playback states with both old and new indices
-    _updateVideoPlayback(index, videos, previousIndex);
+    // Update URL to trigger derived provider chain:
+    // context.go() → routerLocationStream → pageContextProvider → activeVideoIdProvider → VideoFeedItem reacts
+    context.go('/home/$index');
   }
 
-  void _updateVideoPlayback(
-      int videoIndex, List<VideoEvent> videos, int previousPageIndex) {
-    if (videoIndex < 0 || videoIndex >= videos.length) return;
-
-    // With single video controller, no need to pause all videos first
-    // The controller automatically stops the previous video when switching
-    Log.debug('🎬 Playing video at index $videoIndex (single controller handles previous video cleanup)',
-        name: 'VideoFeedScreen', category: LogCategory.ui);
-
-    // Play the current video - single controller handles the rest
-    final currentVideo = videos[videoIndex];
-    _playVideo(currentVideo.id);
-  }
-
-  void _playVideo(String videoId) {
-    try {
-      // Video playback is now handled by the VideoFeedItem when it detects visibility
-      // No need to manually play - the single controller architecture handles this
-      Log.debug('Current video set to: ${videoId.substring(0, 8)}...',
-          name: 'VideoFeedScreen', category: LogCategory.ui);
-    } catch (e) {
-      Log.error('Error setting current video $videoId: $e',
-          name: 'VideoFeedScreen', category: LogCategory.ui);
-    }
-  }
+  // Legacy methods removed - active video is now derived from URL via activeVideoIdProvider
 
   void _pauseAllVideos() {
-    Log.debug('📱 _pauseAllVideos called, widget mounted: $mounted',
+    Log.debug('📱 _pauseAllVideos called - derived provider handles pause automatically',
         name: 'VideoFeedScreen', category: LogCategory.ui);
-    try {
-      // Clear active video; per-item controllers will stop/dispose via autoDispose
-      ref.read(activeVideoProvider.notifier).clearActiveVideo();
-      Log.debug('Cleared active video', name: 'VideoFeedScreen', category: LogCategory.ui);
-    } catch (e) {
-      Log.error('Error pausing videos: $e',
-          name: 'VideoFeedScreen', category: LogCategory.ui);
-    }
+    // When app backgrounds, appForegroundProvider updates → activeVideoIdProvider returns null → VideoFeedItem pauses
   }
 
   /// Public method to pause videos from external sources (like navigation)
@@ -299,40 +256,8 @@ class _VideoFeedScreenState extends ConsumerState<VideoFeedScreen>
 
   /// Public method to resume videos from external sources (like navigation)
   void resumeVideos() {
-    _resumeCurrentVideo();
-
-    // Resume is handled by the single video controller when videos become visible
-  }
-
-  // Context filtering is now handled by Riverpod feed mode providers
-
-  void _resumeCurrentVideo() {
-    Log.debug('📱 _resumeCurrentVideo called, widget mounted: $mounted, currentIndex: $_currentIndex',
-        name: 'VideoFeedScreen', category: LogCategory.ui);
-
-    Log.debug('🔍 Attempting ref.read(homeFeedProvider) from _resumeCurrentVideo, mounted: $mounted',
-        name: 'VideoFeedScreen', category: LogCategory.ui);
-    final asyncState = ref.read(homeFeedProvider);
-    final feedState = asyncState.hasValue ? asyncState.value : null;
-    if (feedState == null) {
-      Log.debug('_resumeCurrentVideo: feedState is null, returning',
-          name: 'VideoFeedScreen', category: LogCategory.ui);
-      return;
-    }
-
-    final videos = feedState.videos;
-    if (_currentIndex < videos.length) {
-      final currentVideo = videos[_currentIndex];
-      Log.debug('_resumeCurrentVideo: resuming video ${currentVideo.id.substring(0, 8)}...',
-          name: 'VideoFeedScreen', category: LogCategory.ui);
-
-      // Video loading is handled by the single video controller and VideoFeedItem
-
-      _playVideo(currentVideo.id);
-    } else {
-      Log.debug('_resumeCurrentVideo: currentIndex $_currentIndex >= videos.length ${videos.length}',
-          name: 'VideoFeedScreen', category: LogCategory.ui);
-    }
+    // Resume is handled by the derived activeVideoIdProvider
+    // When app foregrounds, appForegroundProvider updates → activeVideoIdProvider recomputes → VideoFeedItem plays
   }
 
   /// Get the currently displayed video
@@ -418,13 +343,8 @@ class _VideoFeedScreenState extends ConsumerState<VideoFeedScreen>
           return _buildEmptyState();
         }
 
-        // Ensure an initial active video is set once when data arrives
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          final currentActive = ref.read(activeVideoProvider);
-          if (currentActive.currentVideoId == null && _currentIndex < videos.length) {
-            ref.read(activeVideoProvider.notifier).setActiveVideo(videos[_currentIndex].id);
-          }
-        });
+        // Initial active video is derived from pageContextProvider + feed state
+        // No manual initialization needed - activeVideoIdProvider handles this automatically
 
         return _buildVideoFeed(videos, feedState);
       },

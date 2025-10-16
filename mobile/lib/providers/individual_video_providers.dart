@@ -290,45 +290,31 @@ class ActiveVideoState {
 }
 
 /// Active video state notifier that tracks transitions
+/// @Deprecated Use active_video_provider.dart (pure derived). This notifier will be removed.
+@Deprecated('Use active_video_provider.dart (pure derived). This notifier will be removed.')
 class ActiveVideoNotifier extends StateNotifier<ActiveVideoState> {
-  ActiveVideoNotifier() : super(const ActiveVideoState());
+  ActiveVideoNotifier() : super(const ActiveVideoState()) {
+    assert(() {
+      // Loud at dev time if anything still constructs this
+      // ignore: avoid_print
+      print('⚠️  DEPRECATED: ActiveVideoNotifier constructed. Migrate to active_video_provider.dart');
+      return true;
+    }());
+  }
 
   /// Get the current active video ID (null if no video is active)
   String? get currentVideoId => state.currentVideoId;
 
   void setActiveVideo(String videoId) {
-    // If setting the same video as active, do nothing
-    if (state.currentVideoId == videoId) {
-      Log.debug('🔄 Video ${videoId.length > 8 ? videoId.substring(0, 8) : videoId}... already active, skipping',
-          name: 'ActiveVideoNotifier', category: LogCategory.system);
-      return;
-    }
-
-    final videoIdDisplay = videoId.length > 8 ? videoId.substring(0, 8) : videoId;
-    final previousIdDisplay = state.currentVideoId != null && state.currentVideoId!.length > 8
-        ? state.currentVideoId!.substring(0, 8)
-        : state.currentVideoId ?? 'none';
-    Log.info('🎯 Setting active video to $videoIdDisplay... (previous: $previousIdDisplay...)',
-        name: 'ActiveVideoNotifier', category: LogCategory.system);
-
-    // Update state with new current and track previous
-    state = ActiveVideoState(
-      currentVideoId: videoId,
-      previousVideoId: state.currentVideoId,
-    );
+    // TEMPORARY: Tripwire disabled for gradual migration
+    // TODO: Re-enable after all files migrated to active_video_provider.dart
+    // No-op - derived provider handles active state
   }
 
   void clearActiveVideo() {
-    final previousIdDisplay = state.currentVideoId != null && state.currentVideoId!.length > 8
-        ? state.currentVideoId!.substring(0, 8)
-        : state.currentVideoId ?? 'none';
-    Log.info('🔄 Clearing active video (was: $previousIdDisplay...)',
-        name: 'ActiveVideoNotifier', category: LogCategory.system);
-
-    state = ActiveVideoState(
-      currentVideoId: null,
-      previousVideoId: state.currentVideoId,
-    );
+    // TEMPORARY: Tripwire disabled for gradual migration
+    // TODO: Re-enable after all files migrated to active_video_provider.dart
+    // No-op - derived provider handles active state
   }
 }
 
