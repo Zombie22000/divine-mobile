@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:openvine/providers/vine_recording_provider.dart';
+import 'package:openvine/screens/vine_drafts_screen.dart';
 import 'package:openvine/utils/video_controller_cleanup.dart';
 import 'package:openvine/screens/pure/video_metadata_screen_pure.dart';
 import 'package:openvine/services/camera/native_macos_camera.dart';
@@ -285,6 +286,28 @@ class _UniversalCameraScreenPureState extends ConsumerState<UniversalCameraScree
           style: TextStyle(color: Colors.white),
         ),
         actions: [
+          // Drafts button - only show when not recording
+          Consumer(
+            builder: (context, ref, child) {
+              final recordingState = ref.watch(vineRecordingProvider);
+              if (recordingState.isRecording) {
+                return const SizedBox.shrink();
+              }
+              return IconButton(
+                key: const Key('drafts-button'),
+                icon: const Icon(Icons.video_library, color: Colors.white),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const VineDraftsScreen(),
+                    ),
+                  );
+                },
+                tooltip: 'Drafts',
+              );
+            },
+          ),
+          // Recording status indicator
           Consumer(
             builder: (context, ref, child) {
               final recordingState = ref.watch(vineRecordingProvider);

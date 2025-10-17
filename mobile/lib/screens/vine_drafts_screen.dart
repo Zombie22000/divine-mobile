@@ -4,18 +4,20 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openvine/models/vine_draft.dart';
+import 'package:openvine/providers/app_providers.dart';
 import 'package:openvine/screens/pure/vine_preview_screen_pure.dart';
 import 'package:openvine/theme/vine_theme.dart';
 
-class VineDraftsScreen extends StatefulWidget {
+class VineDraftsScreen extends ConsumerStatefulWidget {
   const VineDraftsScreen({super.key});
 
   @override
-  State<VineDraftsScreen> createState() => _VineDraftsScreenState();
+  ConsumerState<VineDraftsScreen> createState() => _VineDraftsScreenState();
 }
 
-class _VineDraftsScreenState extends State<VineDraftsScreen> {
+class _VineDraftsScreenState extends ConsumerState<VineDraftsScreen> {
   List<VineDraft> _drafts = [];
   bool _isLoading = true;
 
@@ -31,14 +33,12 @@ class _VineDraftsScreenState extends State<VineDraftsScreen> {
     });
 
     try {
-      // Draft storage not yet implemented - returns empty list
-      // Using microtask to ensure at least one frame of loading state
-      await Future.microtask(() {
-        _drafts = [];
-      });
+      final draftService = await ref.read(draftStorageServiceProvider.future);
+      final drafts = await draftService.getAllDrafts();
 
       if (mounted) {
         setState(() {
+          _drafts = drafts;
           _isLoading = false;
         });
       }
@@ -320,24 +320,30 @@ class _VineDraftsScreenState extends State<VineDraftsScreen> {
 
   Future<void> _confirmDeleteDraft(VineDraft draft) async {
     try {
-      // Draft storage not yet implemented - remove from memory only
+      final draftService = await ref.read(draftStorageServiceProvider.future);
+      await draftService.deleteDraft(draft.id);
+
       setState(() {
         _drafts.remove(draft);
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Draft deleted'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Draft deleted'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to delete draft: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete draft: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -374,24 +380,30 @@ class _VineDraftsScreenState extends State<VineDraftsScreen> {
 
   Future<void> _clearAllDrafts() async {
     try {
-      // Draft storage not yet implemented - clear from memory only
+      final draftService = await ref.read(draftStorageServiceProvider.future);
+      await draftService.clearAllDrafts();
+
       setState(() {
         _drafts.clear();
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('All drafts cleared'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('All drafts cleared'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to clear drafts: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to clear drafts: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 }

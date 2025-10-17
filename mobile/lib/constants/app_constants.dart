@@ -40,6 +40,11 @@ class AppConstants {
   // CURATION SETS
   // ============================================================================
 
+  /// Event ID for the official Editor's Picks curation list (kind 30005)
+  /// This is a Nostr event containing the curated video list
+  static const String editorPicksEventId =
+      '76c71aae3a491f1d9eec47cba17e229cda4113a0bbb6e6ae1776d7643e29cafa';
+
   /// Maximum videos to show in Editor's Picks
   static const int editorPicksLimit = 25;
 

@@ -4,8 +4,10 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openvine/models/vine_draft.dart';
+import 'package:openvine/providers/app_providers.dart';
 import 'package:openvine/screens/vine_drafts_screen.dart';
 import 'package:openvine/services/draft_storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -52,9 +54,14 @@ void main() {
 
       // Act: Build the screen
       await tester.pumpWidget(
-        MaterialApp(
-          theme: ThemeData.dark(),
-          home: const VineDraftsScreen(),
+        ProviderScope(
+          overrides: [
+            draftStorageServiceProvider.overrideWith((ref) async => draftService),
+          ],
+          child: MaterialApp(
+            theme: ThemeData.dark(),
+            home: const VineDraftsScreen(),
+          ),
         ),
       );
 
@@ -76,9 +83,14 @@ void main() {
     testWidgets('should show empty state when no drafts exist', (tester) async {
       // Act: Build the screen with no drafts
       await tester.pumpWidget(
-        MaterialApp(
-          theme: ThemeData.dark(),
-          home: const VineDraftsScreen(),
+        ProviderScope(
+          overrides: [
+            draftStorageServiceProvider.overrideWith((ref) async => draftService),
+          ],
+          child: MaterialApp(
+            theme: ThemeData.dark(),
+            home: const VineDraftsScreen(),
+          ),
         ),
       );
 
@@ -124,9 +136,14 @@ void main() {
 
       // Act: Build screen
       await tester.pumpWidget(
-        MaterialApp(
-          theme: ThemeData.dark(),
-          home: const VineDraftsScreen(),
+        ProviderScope(
+          overrides: [
+            draftStorageServiceProvider.overrideWith((ref) async => draftService),
+          ],
+          child: MaterialApp(
+            theme: ThemeData.dark(),
+            home: const VineDraftsScreen(),
+          ),
         ),
       );
 
@@ -189,9 +206,14 @@ void main() {
 
       // Act: Build screen
       await tester.pumpWidget(
-        MaterialApp(
-          theme: ThemeData.dark(),
-          home: const VineDraftsScreen(),
+        ProviderScope(
+          overrides: [
+            draftStorageServiceProvider.overrideWith((ref) async => draftService),
+          ],
+          child: MaterialApp(
+            theme: ThemeData.dark(),
+            home: const VineDraftsScreen(),
+          ),
         ),
       );
 
@@ -240,9 +262,14 @@ void main() {
 
       // Act: Build screen
       await tester.pumpWidget(
-        MaterialApp(
-          theme: ThemeData.dark(),
-          home: const VineDraftsScreen(),
+        ProviderScope(
+          overrides: [
+            draftStorageServiceProvider.overrideWith((ref) async => draftService),
+          ],
+          child: MaterialApp(
+            theme: ThemeData.dark(),
+            home: const VineDraftsScreen(),
+          ),
         ),
       );
 

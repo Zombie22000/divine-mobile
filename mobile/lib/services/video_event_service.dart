@@ -137,6 +137,10 @@ class VideoEventService extends ChangeNotifier {
   int _duplicateVideoEventCount = 0;
   DateTime? _lastDuplicateVideoLogTime;
 
+  // Track replaceable events per subscription type
+  // Key: "subscriptionType:kind:pubkey:d-tag", Value: (VideoEvent, timestamp)
+  final Map<String, (VideoEvent, int)> _replaceableVideoEvents = {};
+
   // Hashtag and group filtering (per subscription)
   final Map<SubscriptionType, List<String>?> _activeHashtagFilters = {};
   final Map<SubscriptionType, String?> _activeGroupFilters = {};
@@ -682,6 +686,79 @@ class VideoEventService extends ChangeNotifier {
     }
   }
 
+  /// Check and handle replaceable video events (NIP-01, NIP-33)
+  /// Returns true if event should be added to lists (not replaceable, first version, or newer version)
+  /// Returns false if event should be skipped (older version exists)
+  /// Side effect: Removes old version from event lists if newer version arrived
+  bool _handleReplaceableVideoEvent(
+    VideoEvent videoEvent,
+    SubscriptionType subscriptionType,
+    Event originalEvent,
+  ) {
+    // Check if this is a replaceable event (kinds 34235, 34236 are parameterized replaceable)
+    final isReplaceable = originalEvent.kind == 34235 || originalEvent.kind == 34236;
+
+    if (!isReplaceable) {
+      return true; // Not replaceable, allow normal processing
+    }
+
+    // For parameterized replaceable events, construct key: subscriptionType:kind:pubkey:d-tag
+    String replaceKey = '$subscriptionType:${originalEvent.kind}:${originalEvent.pubkey}';
+
+    // Extract d-tag (required for kinds 30000-39999)
+    final dTag = originalEvent.tags.firstWhere(
+      (tag) => tag.isNotEmpty && tag[0] == 'd',
+      orElse: () => <String>[],
+    );
+    if (dTag.isNotEmpty && dTag.length > 1) {
+      replaceKey += ':${dTag[1]}';
+    } else {
+      // No d-tag found - this shouldn't happen for parameterized replaceable events
+      Log.warning(
+        '⚠️ Parameterized replaceable event (kind ${originalEvent.kind}) missing d-tag',
+        name: 'VideoEventService',
+        category: LogCategory.video,
+      );
+      return true; // Allow normal processing without replacement logic
+    }
+
+    // Check if we've seen this replaceable event before
+    if (_replaceableVideoEvents.containsKey(replaceKey)) {
+      final (oldVideoEvent, oldTimestamp) = _replaceableVideoEvents[replaceKey]!;
+
+      if (originalEvent.createdAt > oldTimestamp) {
+        // New event is newer - replace the old one
+        Log.info(
+          '🔄 Replacing old kind ${originalEvent.kind} event (ts:$oldTimestamp) with newer (ts:${originalEvent.createdAt})',
+          name: 'VideoEventService',
+          category: LogCategory.video,
+        );
+
+        // Remove old event from event list
+        final eventList = _eventLists[subscriptionType];
+        if (eventList != null) {
+          eventList.removeWhere((e) => e.id == oldVideoEvent.id);
+        }
+
+        // Update tracking with new event
+        _replaceableVideoEvents[replaceKey] = (videoEvent, originalEvent.createdAt);
+        return true; // Allow new event to be added
+      } else {
+        // Incoming event is older - drop it
+        Log.info(
+          '⏩ Skipping older kind ${originalEvent.kind} event (ts:${originalEvent.createdAt}) - newer version exists (ts:$oldTimestamp)',
+          name: 'VideoEventService',
+          category: LogCategory.video,
+        );
+        return false; // Skip this event
+      }
+    } else {
+      // First time seeing this replaceable event
+      _replaceableVideoEvents[replaceKey] = (videoEvent, originalEvent.createdAt);
+      return true; // Allow normal processing
+    }
+  }
+
   /// Handle new video event from subscription
   void _handleNewVideoEvent(
       dynamic eventData, SubscriptionType subscriptionType) {
@@ -797,6 +874,15 @@ class VideoEventService extends ChangeNotifier {
                 name: 'VideoEventService',
                 category: LogCategory.video);
           }
+
+          // Handle replaceable events (NIP-33)
+          // Returns true if we should add this event (newer or first version)
+          // Returns false if we should skip this event (older than cached version)
+          if (!_handleReplaceableVideoEvent(videoEvent, subscriptionType, event)) {
+            return; // Skip - incoming event is older than what we already have
+          }
+          // If we reach here: either not replaceable, first time seeing it, or newer version
+          // For newer versions, _handleReplaceableVideoEvent already removed the old event
 
           // Check hashtag filter if active
           if (_activeHashtagFilters[subscriptionType] != null &&
@@ -1039,6 +1125,15 @@ class VideoEventService extends ChangeNotifier {
             category: LogCategory.video);
         try {
           final videoEvent = VideoEvent.fromNostrEvent(event);
+
+          // Handle replaceable events (NIP-33)
+          // Returns true if we should add this event (newer or first version)
+          // Returns false if we should skip this event (older than cached version)
+          if (!_handleReplaceableVideoEvent(videoEvent, subscriptionType, event)) {
+            return; // Skip - incoming event is older than what we already have
+          }
+          // If we reach here: either not replaceable, first time seeing it, or newer version
+          // For newer versions, _handleReplaceableVideoEvent already removed the old event
 
           // Check hashtag filter if active
           if (_activeHashtagFilters[subscriptionType] != null &&
@@ -2914,6 +3009,12 @@ class VideoEventService extends ChangeNotifier {
       addVideoEventForTesting(video, SubscriptionType.discovery, isHistorical: true);
     }
     notifyListeners(); // Notify providers that videos have changed
+  }
+
+  /// Handle a nostr event for testing (exposes _handleNewVideoEvent)
+  @visibleForTesting
+  void handleEventForTesting(Event event, SubscriptionType type) {
+    _handleNewVideoEvent(event, type);
   }
 
 }

@@ -271,6 +271,56 @@ class VideoLoadingMetrics {
     );
   }
 
+  /// Track video segment loading
+  void markSegmentLoaded(String videoId, {
+    required int segmentIndex,
+    required int segmentSizeBytes,
+    required int loadTimeMs,
+  }) {
+    final session = _activeSessions[videoId];
+    if (session == null) return;
+
+    session.segmentsLoaded.add(_SegmentLoadInfo(
+      index: segmentIndex,
+      sizeBytes: segmentSizeBytes,
+      loadTimeMs: loadTimeMs,
+    ));
+
+    UnifiedLogger.debug(
+      'Segment $segmentIndex loaded for ${videoId.substring(0, 8)}... (${segmentSizeBytes} bytes in ${loadTimeMs}ms)',
+      name: 'VideoLoadingMetrics',
+    );
+  }
+
+  /// Track segment loading failure
+  void markSegmentFailed(String videoId, {
+    required int segmentIndex,
+    required String errorMessage,
+  }) {
+    final session = _activeSessions[videoId];
+    if (session == null) return;
+
+    session.failedSegments.add(segmentIndex);
+
+    UnifiedLogger.warning(
+      'Segment $segmentIndex failed for ${videoId.substring(0, 8)}... - $errorMessage',
+      name: 'VideoLoadingMetrics',
+    );
+  }
+
+  /// Track total segments for a video
+  void setTotalSegments(String videoId, int totalSegments) {
+    final session = _activeSessions[videoId];
+    if (session == null) return;
+
+    session.totalSegments = totalSegments;
+
+    UnifiedLogger.debug(
+      'Video ${videoId.substring(0, 8)}... has $totalSegments segments',
+      name: 'VideoLoadingMetrics',
+    );
+  }
+
   /// Get current loading status for a video
   VideoLoadingStatus? getLoadingStatus(String videoId) {
     final session = _activeSessions[videoId];
@@ -308,6 +358,14 @@ class VideoLoadingMetrics {
         .map((event) => event.endTime!.difference(event.startTime).inMilliseconds)
         .fold<int>(0, (sum, duration) => sum + duration);
 
+    // Calculate segment statistics
+    final segmentsLoaded = session.segmentsLoaded.length;
+    final segmentsFailed = session.failedSegments.length;
+    final totalSegmentBytes = session.segmentsLoaded.fold<int>(0, (sum, seg) => sum + seg.sizeBytes);
+    final avgSegmentLoadTime = segmentsLoaded > 0
+        ? session.segmentsLoaded.fold<int>(0, (sum, seg) => sum + seg.loadTimeMs) / segmentsLoaded
+        : 0;
+
     // Send to Firebase Analytics
     _analytics.logEvent(
       name: 'video_loading_complete',
@@ -323,6 +381,11 @@ class VideoLoadingMetrics {
         'bytes_downloaded': session.bytesDownloaded ?? 0,
         'estimated_bandwidth_mbps': session.estimatedBandwidth ?? 0.0,
         'segment_count': session.segmentCount ?? 0,
+        'total_segments': session.totalSegments ?? 0,
+        'segments_loaded': segmentsLoaded,
+        'segments_failed': segmentsFailed,
+        'total_segment_bytes': totalSegmentBytes,
+        'avg_segment_load_ms': avgSegmentLoadTime.toStringAsFixed(0),
         'video_url_domain': Uri.tryParse(session.videoUrl)?.host ?? 'unknown',
       },
     );
@@ -428,8 +491,11 @@ class _VideoLoadingSession {
   int? bytesDownloaded;
   double? estimatedBandwidth;
   int? segmentCount;
+  int? totalSegments;
 
   final List<_BufferingEvent> bufferingEvents = [];
+  final List<_SegmentLoadInfo> segmentsLoaded = [];
+  final List<int> failedSegments = [];
 
   VideoLoadingStage _getCurrentStage() {
     if (errorTime != null) return VideoLoadingStage.error;
@@ -448,6 +514,19 @@ class _BufferingEvent {
 
   final DateTime startTime;
   DateTime? endTime;
+}
+
+/// Tracks individual segment loading
+class _SegmentLoadInfo {
+  _SegmentLoadInfo({
+    required this.index,
+    required this.sizeBytes,
+    required this.loadTimeMs,
+  });
+
+  final int index;
+  final int sizeBytes;
+  final int loadTimeMs;
 }
 
 /// Extension to easily add metrics to VideoEvent

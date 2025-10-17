@@ -54,6 +54,10 @@ class CurationService {
   // Track video IDs that failed to fetch from relays to avoid repeated attempts
   final Set<String> _missingVideoIds = {};
 
+  // Editor's picks curation list state
+  CurationSet? _editorPicksCurationList;
+  bool _hasFetchedEditorsList = false;
+
   /// Current curation sets
   List<CurationSet> get curationSets => _curationSets.values.toList();
 
@@ -123,87 +127,255 @@ class CurationService {
         name: 'CurationService', category: LogCategory.system);
   }
 
+  /// Fetch the official Editor's Picks curation list from relay
+  Future<void> _fetchEditorsPicksListFromRelay() async {
+    if (_hasFetchedEditorsList) {
+      return; // Only fetch once
+    }
+
+    _hasFetchedEditorsList = true;
+
+    try {
+      Log.info("📋 Fetching official Editor's Picks curation list from relay...",
+          name: 'CurationService', category: LogCategory.system);
+      Log.info('  Event ID: ${AppConstants.editorPicksEventId}',
+          name: 'CurationService', category: LogCategory.system);
+
+      // Subscribe to fetch the specific curation list event
+      final filter = Filter(
+        ids: [AppConstants.editorPicksEventId],
+      );
+      final eventStream = _nostrService.subscribeToEvents(
+        filters: [filter],
+      );
+
+      final completer = Completer<void>();
+      late StreamSubscription<Event> streamSubscription;
+
+      streamSubscription = eventStream.listen(
+        (event) {
+          try {
+            if (event.kind == 30005) {
+              final curationSet = CurationSet.fromNostrEvent(event);
+              _editorPicksCurationList = curationSet;
+              Log.info(
+                  "✅ Fetched Editor's Picks list: ${curationSet.title} with ${curationSet.videoIds.length} videos",
+                  name: 'CurationService',
+                  category: LogCategory.system);
+            } else {
+              Log.warning(
+                  "Expected kind 30005 curation list, got kind ${event.kind}",
+                  name: 'CurationService',
+                  category: LogCategory.system);
+            }
+            streamSubscription.cancel();
+            if (!completer.isCompleted) completer.complete();
+          } catch (e) {
+            Log.error("Failed to parse Editor's Picks curation list: $e",
+                name: 'CurationService', category: LogCategory.system);
+            streamSubscription.cancel();
+            if (!completer.isCompleted) completer.complete();
+          }
+        },
+        onError: (error) {
+          Log.error("Error fetching Editor's Picks list: $error",
+              name: 'CurationService', category: LogCategory.system);
+          streamSubscription.cancel();
+          if (!completer.isCompleted) completer.complete();
+        },
+        onDone: () {
+          if (!completer.isCompleted) completer.complete();
+        },
+      );
+
+      // Wait for completion or timeout
+      await Future.any([
+        completer.future,
+        Future.delayed(const Duration(seconds: 5)),
+      ]);
+
+      await streamSubscription.cancel();
+
+      if (_editorPicksCurationList == null) {
+        Log.warning(
+            "⚠️ Failed to fetch Editor's Picks list from relay - will be empty",
+            name: 'CurationService',
+            category: LogCategory.system);
+        return;
+      }
+
+      // Now fetch any missing videos from the relay
+      await _fetchMissingEditorsPicksVideos();
+    } catch (e) {
+      Log.error("Error fetching Editor's Picks list: $e",
+          name: 'CurationService', category: LogCategory.system);
+    }
+  }
+
+  /// Fetch videos from the editor's picks list that aren't in local cache
+  Future<void> _fetchMissingEditorsPicksVideos() async {
+    if (_editorPicksCurationList == null) return;
+
+    final allVideos = _videoEventService.discoveryVideos;
+    final listVideoIds = _editorPicksCurationList!.videoIds;
+    final missingEventIds = <String>[];
+
+    // Find videos not in local cache
+    for (final videoId in listVideoIds) {
+      if (!allVideos.any((v) => v.id == videoId)) {
+        missingEventIds.add(videoId);
+      }
+    }
+
+    if (missingEventIds.isEmpty) {
+      Log.info(
+          "✅ All ${listVideoIds.length} editor's picks videos already cached",
+          name: 'CurationService',
+          category: LogCategory.system);
+      return;
+    }
+
+    Log.info(
+        "📡 Fetching ${missingEventIds.length} missing editor's picks videos from relays...",
+        name: 'CurationService',
+        category: LogCategory.system);
+
+    try {
+      final filter = Filter(ids: missingEventIds);
+      final eventStream = _nostrService.subscribeToEvents(filters: [filter]);
+
+      final fetchedVideos = <VideoEvent>[];
+      final completer = Completer<void>();
+      late StreamSubscription<Event> streamSubscription;
+      var receivedCount = 0;
+      final targetCount = missingEventIds.length;
+
+      streamSubscription = eventStream.listen(
+        (event) {
+          try {
+            final video = VideoEvent.fromNostrEvent(event);
+            fetchedVideos.add(video);
+            receivedCount++;
+
+            Log.info(
+                "📹 Fetched editor's pick video ($receivedCount/$targetCount): ${video.title ?? video.id.substring(0, 8)}",
+                name: 'CurationService',
+                category: LogCategory.system);
+
+            // Add to video event service cache
+            // This triggers videoEventsProvider → curationProvider refresh chain
+            _videoEventService.addVideoEvent(video);
+
+            // Complete if we got all videos
+            if (receivedCount >= targetCount) {
+              streamSubscription.cancel();
+              if (!completer.isCompleted) completer.complete();
+            }
+          } catch (e) {
+            Log.error("Failed to parse editor's pick video event: $e",
+                name: 'CurationService', category: LogCategory.system);
+          }
+        },
+        onError: (error) {
+          Log.error("Error fetching editor's pick videos: $error",
+              name: 'CurationService', category: LogCategory.system);
+          streamSubscription.cancel();
+          if (!completer.isCompleted) completer.complete();
+        },
+        onDone: () {
+          if (!completer.isCompleted) completer.complete();
+        },
+      );
+
+      // Wait for completion or timeout (5 seconds)
+      await Future.any([
+        completer.future,
+        Future.delayed(const Duration(seconds: 5)),
+      ]);
+
+      await streamSubscription.cancel();
+
+      Log.info(
+          "✅ Fetched ${fetchedVideos.length}/${missingEventIds.length} editor's picks videos from relays",
+          name: 'CurationService',
+          category: LogCategory.system);
+
+      // Refresh the cache after fetching
+      _populateSampleSets();
+    } catch (e) {
+      Log.error("Failed to fetch missing editor's picks videos: $e",
+          name: 'CurationService', category: LogCategory.system);
+    }
+  }
+
   /// Algorithm for selecting editor's picks
   List<VideoEvent> _selectEditorsPicksVideos(
     List<VideoEvent> byTime,
     List<VideoEvent> byReactions,
   ) {
     final picks = <VideoEvent>[];
-    final seenIds = <String>{};
 
-    // Editor's Pick: Only show videos from the classic vines curator pubkey
-    const editorPubkey = AppConstants.classicVinesPubkey;
-
-    // Get all videos from the editor's pubkey
-    final editorVideos = _videoEventService.discoveryVideos
-        .where((video) => video.pubkey == editorPubkey)
-        .toList();
-
-    // Only log on changes to avoid spam
-    if (_lastEditorVideoCount != editorVideos.length) {
-      Log.debug("🔍 Selecting Editor's Picks...",
-          name: 'CurationService', category: LogCategory.system);
-      Log.debug('  Editor pubkey: $editorPubkey',
-          name: 'CurationService', category: LogCategory.system);
+    // If we don't have the curation list yet, start fetching it (async)
+    if (!_hasFetchedEditorsList) {
+      _fetchEditorsPicksListFromRelay();
       Log.debug(
-          '  Total videos available: ${_videoEventService.discoveryVideos.length}',
+          "⏳ Editor's Picks list not fetched yet, starting fetch in background",
           name: 'CurationService',
           category: LogCategory.system);
-      Log.debug("  Found ${editorVideos.length} videos from editor's pubkey",
-          name: 'CurationService', category: LogCategory.system);
-
-      _lastEditorVideoCount = editorVideos.length;
+      return picks; // Return empty for now
     }
 
-    // Debug: Check a few videos to see why they might not be from editor
-    if (editorVideos.isEmpty && _videoEventService.discoveryVideos.isNotEmpty) {
-      Log.debug('  Sample of available videos:',
+    // If fetch completed but found no list, return empty
+    if (_editorPicksCurationList == null) {
+      Log.verbose("📋 No Editor's Picks curation list available",
           name: 'CurationService', category: LogCategory.system);
-      for (var i = 0;
-          i < 3 && i < _videoEventService.discoveryVideos.length;
-          i++) {
-        final video = _videoEventService.discoveryVideos[i];
-        Log.debug(
-            '    Video ${i + 1}: pubkey=${video.pubkey.substring(0, 8)}... title="${video.title}"',
-            name: 'CurationService',
-            category: LogCategory.system);
+      return picks;
+    }
+
+    // Get videos from the curation list
+    final allVideos = _videoEventService.discoveryVideos;
+    final listVideoIds = _editorPicksCurationList!.videoIds;
+
+    // Only log on changes to avoid spam
+    final currentCount = listVideoIds.length;
+    if (_lastEditorVideoCount != currentCount) {
+      Log.debug("🔍 Selecting Editor's Picks from curation list...",
+          name: 'CurationService', category: LogCategory.system);
+      Log.debug('  List: ${_editorPicksCurationList!.title}',
+          name: 'CurationService', category: LogCategory.system);
+      Log.debug('  Video IDs in list: ${listVideoIds.length}',
+          name: 'CurationService', category: LogCategory.system);
+      Log.debug('  Total videos available: ${allVideos.length}',
+          name: 'CurationService', category: LogCategory.system);
+
+      _lastEditorVideoCount = currentCount;
+    }
+
+    // Find videos matching the curation list's video IDs
+    for (final videoId in listVideoIds) {
+      try {
+        final video = allVideos.firstWhere(
+          (v) => v.id == videoId,
+        );
+        picks.add(video);
+        Log.verbose('  ✓ Added: ${video.title ?? video.id.substring(0, 8)}',
+            name: 'CurationService', category: LogCategory.system);
+      } catch (e) {
+        // Video not found in local cache, skip it
+        Log.verbose('  ✗ Not found locally: ${videoId.substring(0, 8)}',
+            name: 'CurationService', category: LogCategory.system);
       }
     }
 
-    // Randomize editor's videos order instead of sorting by time
-    editorVideos.shuffle(Random());
-
-    // Only log randomization on changes
-    if (_lastEditorVideoCount != editorVideos.length) {
-      Log.debug('  Randomized order of ${editorVideos.length} editor videos',
-          name: 'CurationService', category: LogCategory.system);
-    }
-
-    // Add all editor's videos to picks
-    for (final video in editorVideos) {
-      picks.add(video);
-      seenIds.add(video.id);
-      Log.verbose(
-          '  Added editor video: ${video.title ?? video.id.substring(0, 8)}',
-          name: 'CurationService',
-          category: LogCategory.system);
-    }
-
-    // If no videos from editor, leave picks empty - don't add fallback content
-    if (picks.isEmpty) {
-      Log.info(
-          "No videos found from editor's pubkey - editor's picks will be empty",
-          name: 'CurationService',
-          category: LogCategory.system);
-    }
-
     // Only log completion on changes
-    if (_lastEditorVideoCount == editorVideos.length) {
+    if (_lastEditorVideoCount == currentCount) {
       Log.verbose("  Editor's picks selection complete: ${picks.length} videos",
           name: 'CurationService', category: LogCategory.system);
     } else {
-      Log.debug("  Editor's picks selection complete: ${picks.length} videos",
-          name: 'CurationService', category: LogCategory.system);
+      Log.debug(
+          "  Editor's picks selection complete: ${picks.length}/${listVideoIds.length} videos found",
+          name: 'CurationService',
+          category: LogCategory.system);
     }
 
     return picks;

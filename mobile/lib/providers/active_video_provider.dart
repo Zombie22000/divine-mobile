@@ -50,7 +50,7 @@ final activeVideoIdProvider = Provider<String?>((ref) {
 
   final videos = videosAsync.maybeWhen(
     data: (state) => state.videos,
-    orElse: () => const [],
+    orElse: () => const <VideoEvent>[],
   );
 
   if (videos.isEmpty) return null;

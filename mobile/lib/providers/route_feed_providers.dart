@@ -3,6 +3,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openvine/models/video_event.dart';
+import 'package:openvine/providers/app_providers.dart';
 import 'package:openvine/providers/home_feed_provider.dart';
 import 'package:openvine/providers/video_events_providers.dart';
 import 'package:openvine/router/page_context_provider.dart';
@@ -32,6 +33,7 @@ final videosForHomeRouteProvider =
 /// Explore feed state (discovery/all videos)
 /// Returns AsyncValue<VideoFeedState> for route-aware explore screen
 /// Sorted by loop count (descending) to match ExploreScreen tabs
+/// Filters out broken videos to match grid UI behavior
 final videosForExploreRouteProvider =
     Provider<AsyncValue<VideoFeedState>>((ref) {
   final contextAsync = ref.watch(pageContextProvider);
@@ -42,12 +44,22 @@ final videosForExploreRouteProvider =
         // Not on explore route - return loading
         return const AsyncValue.loading();
       }
-      // On explore route - watch video events and convert to VideoFeedState
+      // On explore route - watch video events and broken video tracker
       final eventsAsync = ref.watch(videoEventsProvider);
+      final brokenTrackerAsync = ref.watch(brokenVideoTrackerProvider);
+
       return eventsAsync.when(
         data: (videos) {
+          // Filter out broken videos to match ComposableVideoGrid behavior
+          final filteredVideos = brokenTrackerAsync.maybeWhen(
+            data: (tracker) => videos
+                .where((video) => !tracker.isVideoBroken(video.id))
+                .toList(),
+            orElse: () => videos, // No filtering if tracker not ready
+          );
+
           // Sort by loop count (descending) to match ExploreScreen tabs
-          final sortedVideos = List<VideoEvent>.from(videos);
+          final sortedVideos = List<VideoEvent>.from(filteredVideos);
           sortedVideos.sort((a, b) {
             final aLoops = a.originalLoops ?? 0;
             final bLoops = b.originalLoops ?? 0;

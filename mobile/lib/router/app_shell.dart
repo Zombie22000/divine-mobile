@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:openvine/utils/unified_logger.dart';
@@ -118,7 +119,25 @@ class AppShell extends ConsumerWidget {
                 icon: const Icon(Icons.arrow_back),
                 onPressed: () {
                   Log.info('👆 User tapped back button', name: 'Navigation', category: LogCategory.ui);
-                  Navigator.of(context).pop();
+
+                  // Get current route context
+                  final ctx = ref.read(pageContextProvider).asData?.value;
+                  if (ctx == null) return;
+
+                  // Determine where to navigate based on current context
+                  if (ctx.videoIndex != null) {
+                    // In feed mode - go to grid mode (remove videoIndex)
+                    final gridCtx = RouteContext(
+                      type: ctx.type,
+                      hashtag: ctx.hashtag,
+                      searchTerm: ctx.searchTerm,
+                      videoIndex: null, // Remove index to enter grid mode
+                    );
+                    context.go(buildRoute(gridCtx));
+                  } else {
+                    // In grid mode - go back to explore
+                    context.go('/explore');
+                  }
                 },
               )
             : null,

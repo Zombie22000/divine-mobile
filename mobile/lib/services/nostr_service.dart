@@ -371,7 +371,7 @@ class NostrService implements INostrService {
           if (event.kind >= 30000 && event.kind < 40000) {
             final dTag = event.tags.firstWhere(
               (tag) => tag.isNotEmpty && tag[0] == 'd',
-              orElse: () => [],
+              orElse: () => <String>[],
             );
             if (dTag.isNotEmpty && dTag.length > 1) {
               replaceKey += ':${dTag[1]}';
