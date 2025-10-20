@@ -311,6 +311,7 @@ class _SafeNetworkImage extends StatelessWidget {
       width: width,
       height: height,
       fit: fit,
+      alignment: Alignment.topCenter,
       placeholder: (context, url) => _buildFallback(),
       errorWidget: (context, url, error) {
         // Log the specific error for debugging
