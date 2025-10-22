@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:nostr_sdk/event.dart';
 import 'package:nostr_sdk/filter.dart';
 import 'package:openvine/constants/app_constants.dart';
+import 'package:openvine/models/user_profile.dart';
 import 'package:openvine/models/video_event.dart';
 import 'package:openvine/services/connection_status_service.dart';
 import 'package:openvine/services/content_blocklist_service.dart';
@@ -882,8 +883,27 @@ class VideoEventService extends ChangeNotifier {
       );
 
       if (!NIP71VideoKinds.isVideoKind(event.kind) && event.kind != 6) {
-        Log.warning('⏩ Skipping non-video/repost event (kind ${event.kind})',
-            name: 'VideoEventService', category: LogCategory.video);
+        // Cache non-video events in appropriate services instead of discarding
+        if (event.kind == 0 && _userProfileService != null) {
+          // Kind 0 = profile metadata - cache it for profile display
+          try {
+            final profile = UserProfile.fromNostrEvent(event);
+            // Fire-and-forget: cache the profile asynchronously
+            _userProfileService.updateCachedProfile(profile).then((_) {
+              Log.verbose('✅ Cached profile event for ${event.pubkey.substring(0, 8)} from video subscription',
+                  name: 'VideoEventService', category: LogCategory.video);
+            }).catchError((e) {
+              Log.error('Failed to cache profile event: $e',
+                  name: 'VideoEventService', category: LogCategory.video);
+            });
+          } catch (e) {
+            Log.error('Failed to parse profile event: $e',
+                name: 'VideoEventService', category: LogCategory.video);
+          }
+        } else {
+          Log.verbose('⏩ Skipping non-video/repost event (kind ${event.kind})',
+              name: 'VideoEventService', category: LogCategory.video);
+        }
         return;
       }
 
