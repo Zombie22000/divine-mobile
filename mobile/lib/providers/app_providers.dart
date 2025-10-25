@@ -19,6 +19,7 @@ import 'package:openvine/services/curation_service.dart';
 import 'package:openvine/services/draft_storage_service.dart';
 // Removed legacy explore_video_manager.dart import
 import 'package:openvine/providers/analytics_providers.dart';
+import 'package:openvine/providers/readiness_gate_providers.dart';
 import 'package:openvine/services/hashtag_service.dart';
 import 'package:openvine/services/mute_service.dart';
 import 'package:openvine/services/nip05_service.dart';
@@ -205,8 +206,14 @@ AuthService authService(Ref ref) {
 INostrService nostrService(Ref ref) {
   final keyManager = ref.watch(nostrKeyManagerProvider);
 
-  // Use factory to create platform-appropriate service
-  final service = NostrServiceFactory.create(keyManager);
+  // Use factory to create platform-appropriate service with initialization callback
+  final service = NostrServiceFactory.create(
+    keyManager,
+    onInitialized: () {
+      // Mark Nostr as initialized when the service completes initialization
+      ref.read(nostrInitializationProvider.notifier).markInitialized();
+    },
+  );
 
   // Note: Initialization is handled explicitly in main.dart to ensure proper async timing
   // Do NOT call NostrServiceFactory.initialize(service) here as it causes double initialization
