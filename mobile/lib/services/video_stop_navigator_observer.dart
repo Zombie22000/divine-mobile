@@ -8,10 +8,17 @@ import 'package:openvine/utils/unified_logger.dart';
 
 class VideoStopNavigatorObserver extends NavigatorObserver {
   @override
+  void didStartUserGesture(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didStartUserGesture(route, previousRoute);
+    // Stop videos as soon as user starts navigation gesture
+    // This fires BEFORE the new route is pushed
+    _stopAllVideos('didStartUserGesture', route.settings.name);
+  }
+
+  @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPush(route, previousRoute);
-    // Pause videos when any new route is pushed
-    // This handles modals, dialogs, and full-screen navigations
+    // Also stop on push for programmatic navigation (non-gesture)
     _stopAllVideos('didPush', route.settings.name);
   }
 
@@ -21,16 +28,13 @@ class VideoStopNavigatorObserver extends NavigatorObserver {
       if (navigator?.context != null) {
         final container = ProviderScope.containerOf(navigator!.context);
 
-        // Delay provider modification until after widget tree build is complete
-        Future(() {
-          // Stop ALL videos on ANY route change
-          // This ensures clean transitions and prevents videos from playing in background
-          disposeAllVideoControllers(container);
-          Log.info(
-              '📱 Navigation $action to route: ${routeName ?? 'unnamed'} - stopped all videos',
-              name: 'VideoStopNavigatorObserver',
-              category: LogCategory.system);
-        });
+        // Stop videos immediately - no delay
+        // This ensures videos stop BEFORE the new route builds
+        disposeAllVideoControllers(container);
+        Log.info(
+            '📱 Navigation $action to route: ${routeName ?? 'unnamed'} - stopped all videos',
+            name: 'VideoStopNavigatorObserver',
+            category: LogCategory.system);
       }
     } catch (e) {
       Log.error('Failed to handle navigation: $e',

@@ -399,6 +399,8 @@ class ContentReportingService {
         return 'This content contains misinformation or deliberately false information.';
       case ContentFilterReason.csam:
         return 'This content violates child safety policies and may contain illegal material.';
+      case ContentFilterReason.aiGenerated:
+        return 'This content appears to be AI-generated and may violate authenticity policies.';
       case ContentFilterReason.other:
         return 'This content violates community guidelines.';
     }

@@ -39,6 +39,9 @@ class UserProfileService {
   final Set<String> _knownMissingProfiles = {};
   final Map<String, DateTime> _missingProfileRetryAfter = {};
 
+  // Completers to track when profile fetches complete
+  final Map<String, Completer<UserProfile?>> _profileFetchCompleters = {};
+
   // Prefetch tracking
   bool _prefetchActive = false;
   DateTime? _lastPrefetchAt;
@@ -182,6 +185,12 @@ class UserProfileService {
 
       // Cancel any existing subscriptions for this pubkey
       _cleanupProfileRequest(pubkey);
+
+      // Cancel and remove any pending completers for this pubkey
+      final completer = _profileFetchCompleters.remove(pubkey);
+      if (completer != null && !completer.isCompleted) {
+        completer.complete(null); // Complete with null to unblock any waiters
+      }
     }
 
     // Return cached profile if available and not forcing refresh
@@ -204,9 +213,17 @@ class UserProfileService {
       return cachedProfile;
     }
 
-    // Check if already requesting this profile - STOP HERE, don't create duplicate subscriptions
+    // Check if already requesting this profile - return existing completer's future
     // (Note: forceRefresh already cleaned up existing requests above)
     if (_pendingRequests.contains(pubkey)) {
+      // Return existing completer's future if available
+      if (_profileFetchCompleters.containsKey(pubkey)) {
+        Log.debug(
+            'Reusing existing fetch request for ${pubkey}...',
+            name: 'UserProfileService',
+            category: LogCategory.system);
+        return _profileFetchCompleters[pubkey]!.future;
+      }
       return null;
     }
 
@@ -232,6 +249,10 @@ class UserProfileService {
     try {
       _pendingRequests.add(pubkey);
 
+      // Create a completer to track this fetch request
+      final completer = Completer<UserProfile?>();
+      _profileFetchCompleters[pubkey] = completer;
+
       // Add to batch instead of creating individual subscription
       _pendingBatchPubkeys.add(pubkey);
 
@@ -241,12 +262,20 @@ class UserProfileService {
         _executeBatchFetch();
       });
 
-      return null; // Profile will be available in cache once batch loaded
+      // Return the completer's future - it will complete when batch fetch finishes
+      return completer.future;
     } catch (e) {
       Log.error('Failed to fetch profile for ${pubkey}: $e',
           name: 'UserProfileService', category: LogCategory.system);
       _pendingRequests.remove(pubkey);
       _pendingBatchPubkeys.remove(pubkey);
+
+      // Complete completer with error if it exists
+      final completer = _profileFetchCompleters.remove(pubkey);
+      if (completer != null && !completer.isCompleted) {
+        completer.completeError(e);
+      }
+
       return null;
     }
   }
@@ -282,6 +311,16 @@ class UserProfileService {
       // Also save to persistent cache
       if (_persistentCache?.isInitialized == true) {
         _persistentCache!.cacheProfile(profile);
+      }
+
+      // Complete any pending fetch requests for this profile
+      final completer = _profileFetchCompleters.remove(event.pubkey);
+      if (completer != null && !completer.isCompleted) {
+        completer.complete(profile);
+        Log.debug(
+            '✅ Completed fetch request for ${event.pubkey}',
+            name: 'UserProfileService',
+            category: LogCategory.system);
       }
 
       _cleanupProfileRequest(event.pubkey);
@@ -556,6 +595,16 @@ class UserProfileService {
       // Mark unfetched profiles as missing to avoid future relay spam
       for (final pubkey in unfetchedPubkeys) {
         markProfileAsMissing(pubkey);
+
+        // Complete pending fetch requests with null for missing profiles
+        final completer = _profileFetchCompleters.remove(pubkey);
+        if (completer != null && !completer.isCompleted) {
+          completer.complete(null);
+          Log.debug(
+              '❌ Completed fetch request for missing profile ${pubkey}',
+              name: 'UserProfileService',
+              category: LogCategory.system);
+        }
       }
     } else {
       Log.info(
@@ -680,6 +729,14 @@ class UserProfileService {
       _subscriptionManager.cancelSubscription(subscriptionId);
     }
     _activeSubscriptionIds.clear();
+
+    // Complete any pending fetch completers
+    for (final completer in _profileFetchCompleters.values) {
+      if (!completer.isCompleted) {
+        completer.complete(null);
+      }
+    }
+    _profileFetchCompleters.clear();
 
     // Dispose connection service to cancel its timer
     _connectionService.dispose();

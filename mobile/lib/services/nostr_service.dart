@@ -19,6 +19,7 @@ import 'package:openvine/services/p2p_discovery_service.dart';
 import 'package:openvine/services/p2p_video_sync_service.dart';
 import 'package:openvine/utils/unified_logger.dart';
 import 'package:openvine/utils/log_batcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Production implementation of NostrService using EmbeddedNostrRelay directly
 /// Manages external relay connections and provides unified API to the app
@@ -56,6 +57,9 @@ class NostrService implements INostrService {
   bool _isDisposed = false;
   final List<String> _configuredRelays = [];
 
+  // SharedPreferences key for persisting relay configuration
+  static const String _relayConfigKey = 'configured_relays';
+
   @override
   Future<void> initialize(
       {List<String>? customRelays, bool enableP2P = true}) async {
@@ -72,9 +76,55 @@ class NostrService implements INostrService {
     Log.info('Starting initialization with embedded relay',
         name: 'NostrService', category: LogCategory.relay);
 
+    // Load relay configuration from SharedPreferences (unless customRelays is explicitly provided)
+    List<String> relaysToAdd;
+    if (customRelays != null) {
+      // If customRelays explicitly provided, use them
+      relaysToAdd = customRelays;
+      Log.info('Using provided customRelays: $customRelays',
+          name: 'NostrService', category: LogCategory.relay);
+    } else {
+      // Load from SharedPreferences or use default
+      final prefs = await SharedPreferences.getInstance();
+      final savedRelays = prefs.getStringList(_relayConfigKey);
+
+      if (savedRelays != null && savedRelays.isNotEmpty) {
+        relaysToAdd = savedRelays;
+        Log.info('✅ Loaded ${savedRelays.length} relay(s) from SharedPreferences',
+            name: 'NostrService', category: LogCategory.relay);
+
+        // MIGRATION: Remove old relay3.openvine.co if present in saved config
+        const oldRelay = 'wss://relay3.openvine.co';
+        if (relaysToAdd.contains(oldRelay)) {
+          Log.info('🔄 MIGRATION: Removing old relay from saved config: $oldRelay',
+              name: 'NostrService', category: LogCategory.relay);
+          relaysToAdd = relaysToAdd.where((r) => r != oldRelay).toList();
+
+          // Ensure we have at least the default relay
+          final defaultRelay = AppConstants.defaultRelayUrl;
+          if (!relaysToAdd.contains(defaultRelay)) {
+            relaysToAdd.add(defaultRelay);
+          }
+
+          // Save migrated config back to SharedPreferences
+          await _saveRelayConfig(relaysToAdd);
+          Log.info('✅ MIGRATION: Saved updated relay config',
+              name: 'NostrService', category: LogCategory.relay);
+        }
+      } else {
+        // No saved config, use default
+        final defaultRelay = AppConstants.defaultRelayUrl;
+        relaysToAdd = [defaultRelay];
+        Log.info('📋 No saved relay config found, using default: $defaultRelay',
+            name: 'NostrService', category: LogCategory.relay);
+
+        // Save default to SharedPreferences for next time
+        await _saveRelayConfig(relaysToAdd);
+      }
+    }
+
     // Ensure default relay is always included
     final defaultRelay = AppConstants.defaultRelayUrl;
-    final relaysToAdd = customRelays ?? [defaultRelay];
     if (!relaysToAdd.contains(defaultRelay)) {
       relaysToAdd.add(defaultRelay);
     }
@@ -901,9 +951,11 @@ class NostrService implements INostrService {
 
     // Add to configured list even if embedded relay isn't ready
     _configuredRelays.add(relayUrl);
-    UnifiedLogger.info('✅ Added relay to IN-MEMORY configuration: $relayUrl', name: 'NostrService');
-    UnifiedLogger.warning('⚠️  WARNING: Relay is NOT persisted to storage! Will be lost on app restart.', name: 'NostrService');
+    UnifiedLogger.info('✅ Added relay to configuration: $relayUrl', name: 'NostrService');
     UnifiedLogger.info('   New relay count: ${_configuredRelays.length}', name: 'NostrService');
+
+    // Persist to SharedPreferences
+    await _saveRelayConfig(_configuredRelays);
 
     // Try to connect if embedded relay is available
     if (_embeddedRelay != null) {
@@ -1039,9 +1091,11 @@ class NostrService implements INostrService {
 
     _configuredRelays.remove(relayUrl);
     _relayAuthStates.remove(relayUrl);
-    UnifiedLogger.info('✅ Removed relay from IN-MEMORY configuration: $relayUrl', name: 'NostrService');
-    UnifiedLogger.warning('⚠️  WARNING: Removal is NOT persisted to storage! Relay may reappear on app restart.', name: 'NostrService');
+    UnifiedLogger.info('✅ Removed relay from configuration: $relayUrl', name: 'NostrService');
     UnifiedLogger.info('   New relay count: ${_configuredRelays.length}', name: 'NostrService');
+
+    // Persist to SharedPreferences
+    await _saveRelayConfig(_configuredRelays);
   }
 
   @override
@@ -1717,6 +1771,23 @@ class NostrService implements INostrService {
     } catch (e) {
       UnifiedLogger.error('Error discovering relays from event hints: $e',
           name: 'NostrService');
+    }
+  }
+
+  // ==========================================================================
+  // Relay Configuration Persistence
+  // ==========================================================================
+
+  /// Save relay configuration to SharedPreferences
+  Future<void> _saveRelayConfig(List<String> relays) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_relayConfigKey, relays);
+      Log.debug('💾 Saved ${relays.length} relay(s) to SharedPreferences',
+          name: 'NostrService', category: LogCategory.relay);
+    } catch (e) {
+      Log.error('Failed to save relay config to SharedPreferences: $e',
+          name: 'NostrService', category: LogCategory.relay);
     }
   }
 }

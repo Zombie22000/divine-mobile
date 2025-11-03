@@ -17,6 +17,8 @@ class VideoEventBuilder {
     this.title = 'Test Video',
     this.duration = 6,
     this.isProcessing = false,
+    this.originalLoops,
+    this.originalLikes,
     Map<String, dynamic>? metadata,
   })  : createdAt = createdAt ?? DateTime.now().millisecondsSinceEpoch ~/ 1000,
         metadata = metadata ?? {};
@@ -31,6 +33,8 @@ class VideoEventBuilder {
   String? title;
   int duration;
   bool isProcessing;
+  int? originalLoops;
+  int? originalLikes;
   Map<String, dynamic> metadata;
 
   /// Build the VideoEvent instance
@@ -44,6 +48,8 @@ class VideoEventBuilder {
         videoUrl: videoUrl,
         thumbnailUrl: thumbnailUrl,
         duration: duration,
+        originalLoops: originalLoops,
+        originalLikes: originalLikes,
       );
 
   /// Create a processing video
@@ -82,6 +88,18 @@ class VideoEventBuilder {
             .subtract(const Duration(minutes: 1))
             .millisecondsSinceEpoch ~/
         1000;
+    return this;
+  }
+
+  /// Set original loops count (for imported Vine data)
+  VideoEventBuilder withOriginalLoops(int? loops) {
+    originalLoops = loops;
+    return this;
+  }
+
+  /// Set original likes count (for imported Vine data)
+  VideoEventBuilder withOriginalLikes(int? likes) {
+    originalLikes = likes;
     return this;
   }
 

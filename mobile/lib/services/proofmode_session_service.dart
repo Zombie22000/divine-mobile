@@ -209,9 +209,39 @@ class ProofModeSessionService {
 
   ProofSession? _currentSession;
   Timer? _pauseMonitorTimer;
+  bool _isInitialized = false;
 
   /// Get the current active session
   ProofSession? get currentSession => _currentSession;
+
+  /// Ensure ProofMode services are initialized (call once before first use)
+  Future<void> ensureInitialized() async {
+    if (_isInitialized) {
+      Log.debug('ProofMode already initialized, skipping',
+          name: 'ProofModeSessionService', category: LogCategory.system);
+      return;
+    }
+
+    Log.info('Initializing ProofMode services for first use',
+        name: 'ProofModeSessionService', category: LogCategory.system);
+
+    try {
+      // Initialize attestation service (fast - just caches device info)
+      await _attestationService.initialize();
+
+      // Initialize key service (slower on first run - generates PGP keys if needed)
+      await _keyService.initialize();
+
+      _isInitialized = true;
+
+      Log.info('ProofMode services initialized successfully',
+          name: 'ProofModeSessionService', category: LogCategory.system);
+    } catch (e) {
+      Log.error('Failed to initialize ProofMode services: $e',
+          name: 'ProofModeSessionService', category: LogCategory.system);
+      rethrow;
+    }
+  }
 
   /// Start a new proof session for vine recording
   Future<String?> startSession({

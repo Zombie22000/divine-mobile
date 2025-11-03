@@ -10,6 +10,8 @@ import 'package:openvine/utils/unified_logger.dart';
 import 'package:openvine/widgets/vine_drawer.dart';
 import 'package:openvine/providers/app_providers.dart';
 import 'package:openvine/providers/active_video_provider.dart';
+import 'package:openvine/providers/user_profile_providers.dart';
+import 'package:openvine/utils/npub_hex.dart';
 import 'page_context_provider.dart';
 import 'route_utils.dart';
 import 'nav_extensions.dart';
@@ -39,7 +41,19 @@ class AppShell extends ConsumerWidget {
         return raw.isEmpty ? '#—' : '#$raw';
       case RouteType.profile:
         final npub = ctx?.npub ?? '';
-        return (npub == 'me') ? 'My Profile' : 'Profile';
+        if (npub == 'me') {
+          return 'My Profile';
+        }
+        // Get user profile to show their display name
+        final userIdHex = npubToHexOrNull(npub);
+        if (userIdHex != null) {
+          final profileAsync = ref.watch(fetchUserProfileProvider(userIdHex));
+          final displayName = profileAsync.value?.displayName;
+          if (displayName != null && !displayName.startsWith('npub1')) {
+            return displayName;
+          }
+        }
+        return 'Profile';
       case RouteType.search:
         return 'Search';
       default:
@@ -165,14 +179,20 @@ class AppShell extends ConsumerWidget {
               ),
         title: Text(
           title,
-          // Pacifico font, with sane fallbacks if font isn't available yet.
-          style: GoogleFonts.pacifico(
-            textStyle: const TextStyle(
-              fontSize: 24,
-              letterSpacing: 0.2,
-              // AppBar handles color via theme; no explicit color needed.
-            ),
-          ),
+          // Use Pacifico font only for 'diVine' on home feed, system font elsewhere
+          style: title == 'diVine'
+              ? GoogleFonts.pacifico(
+                  textStyle: const TextStyle(
+                    fontSize: 24,
+                    letterSpacing: 0.2,
+                    // AppBar handles color via theme; no explicit color needed.
+                  ),
+                )
+              : const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  // AppBar handles color via theme; no explicit color needed.
+                ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),

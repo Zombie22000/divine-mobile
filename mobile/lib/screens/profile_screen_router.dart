@@ -613,12 +613,12 @@ class _ProfileScreenRouterState extends ConsumerState<ProfileScreenRouter>
           children: [
             _buildStatValue(
               profileStatsAsync.value?.totalViews ?? 0,
-              'Total Views',
+              'Known Loops',
               profileStatsAsync.isLoading,
             ),
             _buildStatValue(
               profileStatsAsync.value?.totalLikes ?? 0,
-              'Total Likes',
+              'Known Likes',
               profileStatsAsync.isLoading,
             ),
           ],

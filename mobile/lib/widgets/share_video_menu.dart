@@ -51,6 +51,10 @@ class _ShareVideoMenuState extends ConsumerState<ShareVideoMenu> {
                   child: Column(
                     children: [
                       _buildVideoStatusSection(),
+                      if (!_isUserOwnContent() && !widget.video.isOriginalContent) ...[
+                        const SizedBox(height: 16),
+                        _buildQuickAIReportButton(),
+                      ],
                       const SizedBox(height: 24),
                       _buildShareSection(),
                       const SizedBox(height: 24),
@@ -118,6 +122,118 @@ class _ShareVideoMenuState extends ConsumerState<ShareVideoMenu> {
           ],
         ),
       );
+
+  /// Build quick AI report button for one-tap reporting
+  Widget _buildQuickAIReportButton() => Container(
+        decoration: BoxDecoration(
+          color: Colors.orange.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+        ),
+        child: ListTile(
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.orange.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(Icons.psychology_alt, color: Colors.orange, size: 20),
+          ),
+          title: Text(
+            'Report AI Content',
+            style: TextStyle(
+              color: VineTheme.whiteText,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: Text(
+            'Quick report suspected AI-generated content',
+            style: TextStyle(
+              color: VineTheme.secondaryText,
+              fontSize: 12,
+            ),
+          ),
+          trailing: Icon(Icons.arrow_forward_ios, color: Colors.orange, size: 16),
+          onTap: _quickReportAI,
+        ),
+      );
+
+  /// Quick report for AI-generated content (kind 1984 event)
+  Future<void> _quickReportAI() async {
+    try {
+      // Show loading snackbar
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Text('Reporting AI content...'),
+              ],
+            ),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      final reportService =
+          await ref.read(contentReportingServiceProvider.future);
+      final result = await reportService.reportContent(
+        eventId: widget.video.id,
+        authorPubkey: widget.video.pubkey,
+        reason: ContentFilterReason.aiGenerated,
+        details: 'Suspected AI-generated content',
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop(); // Close share menu
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(
+                  result.success ? Icons.check_circle : Icons.error,
+                  color: Colors.white,
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    result.success
+                        ? 'AI content reported successfully'
+                        : 'Failed to report content: ${result.error}',
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: result.success ? VineTheme.vineGreen : Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      Log.error('Failed to submit AI report: $e',
+          name: 'ShareVideoMenu', category: LogCategory.ui);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to report AI content: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   /// Build video status section showing what lists the video is in
   Widget _buildVideoStatusSection() => Consumer(
@@ -1528,6 +1644,8 @@ class _ReportContentDialogState extends ConsumerState<_ReportContentDialog> {
         return 'False Information';
       case ContentFilterReason.csam:
         return 'Child Safety Violation';
+      case ContentFilterReason.aiGenerated:
+        return 'AI-Generated Content';
       case ContentFilterReason.other:
         return 'Other Policy Violation';
     }

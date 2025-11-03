@@ -1726,7 +1726,7 @@ final class ContentReportingServiceProvider
 }
 
 String _$contentReportingServiceHash() =>
-    r'a7ab20421fc0c2534226e595c97238a0267e12ae';
+    r'90600ce05c4cc607ee58bb9166d14fb5982b7430';
 
 /// Curated list service for NIP-51 lists
 

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openvine/models/video_event.dart';
 import 'package:openvine/providers/app_providers.dart';
+import 'package:openvine/providers/social_providers.dart';
 import 'package:openvine/theme/vine_theme.dart';
 import 'package:openvine/utils/string_utils.dart';
 import 'package:openvine/widgets/video_thumbnail_widget.dart';
@@ -195,39 +196,47 @@ class ComposableVideoGrid extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 3),
-                    // Stats row
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.favorite,
-                          size: 11,
-                          color: VineTheme.likeRed,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          StringUtils.formatCompactNumber(video.originalLikes ?? 0),
-                          style: TextStyle(
-                            color: VineTheme.secondaryText,
-                            fontSize: 10,
-                          ),
-                        ),
-                        if (video.originalLoops != null) ...[
-                          const SizedBox(width: 8),
-                          Icon(
-                            Icons.repeat,
-                            size: 11,
-                            color: VineTheme.secondaryText,
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            StringUtils.formatCompactNumber(video.originalLoops!),
-                            style: TextStyle(
-                              color: VineTheme.secondaryText,
-                              fontSize: 10,
+                    // Stats row - watch social provider for current metrics
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final socialState = ref.watch(socialProvider);
+                        final newLikeCount = socialState.likeCounts[video.id] ?? 0;
+                        final totalLikes = newLikeCount + (video.originalLikes ?? 0);
+
+                        return Row(
+                          children: [
+                            Icon(
+                              Icons.favorite,
+                              size: 11,
+                              color: VineTheme.likeRed,
                             ),
-                          ),
-                        ],
-                      ],
+                            const SizedBox(width: 3),
+                            Text(
+                              StringUtils.formatCompactNumber(totalLikes),
+                              style: TextStyle(
+                                color: VineTheme.secondaryText,
+                                fontSize: 10,
+                              ),
+                            ),
+                            if (video.originalLoops != null) ...[
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.repeat,
+                                size: 11,
+                                color: VineTheme.secondaryText,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                StringUtils.formatCompactNumber(video.originalLoops!),
+                                style: TextStyle(
+                                  color: VineTheme.secondaryText,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),

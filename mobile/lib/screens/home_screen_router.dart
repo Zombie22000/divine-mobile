@@ -55,16 +55,6 @@ class _HomeScreenRouterState extends ConsumerState<HomeScreenRouter>
     }
     _lastBuildTime = now;
 
-    // Check if user follows anyone - redirect to explore if not
-    final socialState = ref.watch(social.socialProvider);
-    if (socialState.isInitialized && socialState.followingPubkeys.isEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          context.go('/explore');
-        }
-      });
-    }
-
     // Read derived context from router
     final pageContext = ref.watch(pageContextProvider);
 
@@ -91,23 +81,35 @@ class _HomeScreenRouterState extends ConsumerState<HomeScreenRouter>
             if (videos.isEmpty) {
               // Handle empty videos case - no clamp needed
               urlIndex = 0;
-              return const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.video_library_outlined, size: 64, color: Colors.grey),
-                    SizedBox(height: 16),
-                    Text(
-                      'No videos available',
-                      style: TextStyle(fontSize: 18, color: Colors.grey),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Follow some creators to see their videos here',
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.people_outline, size: 80, color: Colors.grey),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Your Home Feed is Empty',
+                        style: TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Follow creators to see their videos here',
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 32),
+                      ElevatedButton.icon(
+                        onPressed: () => context.go('/explore'),
+                        icon: const Icon(Icons.explore),
+                        label: const Text('Explore Videos'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }

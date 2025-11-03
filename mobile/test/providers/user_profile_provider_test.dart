@@ -55,7 +55,7 @@ void main() {
 
       // Mock SubscriptionManager.cancelSubscription
       when(() => mockSubscriptionManager.cancelSubscription(any()))
-          .thenReturn(null);
+          .thenAnswer((_) async {});
 
       container = ProviderContainer(
         overrides: [

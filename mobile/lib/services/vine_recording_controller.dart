@@ -928,6 +928,9 @@ class VineRecordingController {
       // Start ProofMode session on first segment
       if (_proofModeSession != null && _currentProofSessionId == null) {
         try {
+          // Ensure ProofMode is initialized (fast after first time)
+          await _proofModeSession!.ensureInitialized();
+
           _currentProofSessionId = await _proofModeSession!.startSession();
           if (_currentProofSessionId != null) {
             await _proofModeSession!.startRecordingSegment();
@@ -983,11 +986,26 @@ class VineRecordingController {
     }
 
     try {
-      final segmentEndTime = DateTime.now();
-      final segmentDuration =
+      var segmentEndTime = DateTime.now();
+      var segmentDuration =
           segmentEndTime.difference(_currentSegmentStartTime!);
 
-      // Only save segments longer than minimum duration
+      // For stop-motion: if user taps very quickly, wait for minimum duration
+      // to ensure at least one frame is captured
+      if (segmentDuration < minSegmentDuration) {
+        final waitTime = minSegmentDuration - segmentDuration;
+        Log.info(
+            '🎬 Stop-motion mode: waiting ${waitTime.inMilliseconds}ms to capture frame',
+            name: 'VineRecordingController',
+            category: LogCategory.system);
+        await Future.delayed(waitTime);
+
+        // Recalculate after waiting
+        segmentEndTime = DateTime.now();
+        segmentDuration = segmentEndTime.difference(_currentSegmentStartTime!);
+      }
+
+      // Now we're guaranteed to have at least minSegmentDuration
       if (segmentDuration >= minSegmentDuration) {
         // For macOS in single recording mode, stop the native recording to get the actual path
         if (!kIsWeb &&

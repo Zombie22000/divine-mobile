@@ -508,8 +508,8 @@ class VideoOverlayActions extends ConsumerWidget {
                     onTap: () {
                       Log.info('👤 User tapped profile: videoId=${video.id}, authorPubkey=${video.pubkey}',
                           name: 'VideoFeedItem', category: LogCategory.ui);
-                      // Navigate to profile tab using GoRouter
-                      context.goProfile(video.pubkey, 0);
+                      // Navigate to profile in grid mode (no video playing)
+                      context.goProfileGrid(video.pubkey);
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

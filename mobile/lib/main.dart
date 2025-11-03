@@ -243,9 +243,10 @@ Future<void> _startOpenVineApp() async {
 
   // Run Hive → Drift migration if needed
   StartupPerformanceService.instance.startPhase('data_migration');
+  AppDatabase? migrationDb;
   try {
-    final db = AppDatabase();
-    final migrationService = MigrationService(db);
+    migrationDb = AppDatabase();
+    final migrationService = MigrationService(migrationDb);
     await migrationService.runMigrations();
     Log.info('[MIGRATION] ✅ Data migration complete',
         name: 'Main', category: LogCategory.system);
@@ -255,6 +256,9 @@ Future<void> _startOpenVineApp() async {
         name: 'Main', category: LogCategory.system);
     Log.verbose('[MIGRATION] Stack: $stack',
         name: 'Main', category: LogCategory.system);
+  } finally {
+    // Close migration database to prevent multiple instances warning
+    await migrationDb?.close();
   }
   StartupPerformanceService.instance.completePhase('data_migration');
 

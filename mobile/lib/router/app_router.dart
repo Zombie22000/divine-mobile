@@ -51,19 +51,22 @@ int tabIndexFromLocation(String loc) {
   }
 }
 
+// Track if we've done initial navigation to avoid redirect loops
+bool _hasNavigated = false;
+
 final goRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: _rootKey,
     initialLocation: '/home/0',
     observers: [VideoStopNavigatorObserver()],
     redirect: (context, state) {
-      // Redirect to explore if user follows nobody
       final location = state.matchedLocation;
 
-      // Only redirect if navigating to home
-      if (location.startsWith('/home')) {
-        // Read social provider to check following count
-        // Note: We use a try-catch in case the provider isn't ready yet
+      // Only redirect to explore on very first navigation if user follows nobody
+      // After that, let users navigate to home freely (they'll see a message to follow people)
+      if (!_hasNavigated && location.startsWith('/home')) {
+        _hasNavigated = true;
+
         try {
           final socialState = ref.read(socialProvider);
 
@@ -73,11 +76,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           }
         } catch (e) {
           // If social provider isn't ready, let the route proceed
-          // (home screen will show loading or empty state)
         }
       }
 
-      // No redirect needed
       return null;
     },
     routes: [

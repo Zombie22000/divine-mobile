@@ -474,10 +474,15 @@ CurationService curationService(Ref ref) {
 Future<ContentReportingService> contentReportingService(Ref ref) async {
   final nostrService = ref.watch(nostrServiceProvider);
   final prefs = await ref.watch(sharedPreferencesProvider.future);
-  return ContentReportingService(
+  final service = ContentReportingService(
     nostrService: nostrService,
     prefs: prefs,
   );
+
+  // Initialize the service to enable reporting
+  await service.initialize();
+
+  return service;
 }
 
 /// Curated list service for NIP-51 lists

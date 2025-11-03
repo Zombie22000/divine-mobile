@@ -21,6 +21,7 @@ enum ContentFilterReason {
   copyright('Copyright violation'),
   falseInformation('Misinformation'),
   csam('Child safety concern'),
+  aiGenerated('Suspected AI-generated content'),
   other('Other violation');
 
   const ContentFilterReason(this.description);
@@ -561,6 +562,8 @@ class ContentModerationService with NostrListServiceMixin {
         baseMessage = 'This content may contain misinformation';
       case ContentFilterReason.csam:
         baseMessage = 'This content violates child safety policies';
+      case ContentFilterReason.aiGenerated:
+        baseMessage = 'This content may be AI-generated';
       case ContentFilterReason.other:
         baseMessage = 'This content may violate community guidelines';
     }
