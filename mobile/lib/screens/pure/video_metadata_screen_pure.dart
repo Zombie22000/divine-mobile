@@ -1,6 +1,7 @@
 // ABOUTME: Pure video metadata screen using revolutionary Riverpod architecture
 // ABOUTME: Adds metadata to recorded videos before publishing without VideoManager dependencies
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,10 +9,12 @@ import 'package:openvine/utils/unified_logger.dart';
 import 'package:video_player/video_player.dart';
 import 'package:openvine/providers/app_providers.dart';
 import 'package:openvine/providers/vine_recording_provider.dart';
-import 'package:openvine/models/pending_upload.dart' show UploadStatus;
+import 'package:openvine/models/pending_upload.dart' show UploadStatus, PendingUpload;
 import 'package:openvine/models/vine_draft.dart';
 import 'package:openvine/services/draft_storage_service.dart';
+import 'package:openvine/services/upload_manager.dart';
 import 'package:openvine/theme/vine_theme.dart';
+import 'package:openvine/widgets/upload_progress_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Pure video metadata screen using revolutionary single-controller Riverpod architecture
@@ -41,6 +44,11 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
   VideoPlayerController? _videoController;
   bool _isVideoInitialized = false;
   VineDraft? _currentDraft;
+
+  // Background upload state (managed by Task 3 - initState/dispose)
+  String? _backgroundUploadId;
+  UploadStatus? _uploadStatus;
+  StreamSubscription? _uploadProgressListener;
 
   @override
   void initState() {
@@ -89,6 +97,9 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
 
         // Initialize video preview
         _initializeVideoPreview();
+
+        // Start background upload immediately (Task 3)
+        _startBackgroundUpload();
       }
     } catch (e) {
       Log.error('📝 Failed to load draft: $e', category: LogCategory.video);
@@ -148,6 +159,93 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
           _isVideoInitialized = false;
         });
       }
+    }
+  }
+
+  /// Start background upload immediately when screen loads (Task 3)
+  Future<void> _startBackgroundUpload() async {
+    if (_currentDraft == null) {
+      Log.warning('📝 Cannot start background upload: draft not loaded',
+          category: LogCategory.video);
+      return;
+    }
+
+    try {
+      final uploadManager = ref.read(uploadManagerProvider);
+      final authService = ref.read(authServiceProvider);
+      final pubkey = authService.currentPublicKeyHex;
+
+      if (pubkey == null) {
+        Log.error('📝 Cannot start background upload: not authenticated',
+            category: LogCategory.video);
+        return;
+      }
+
+      Log.info('📝 Starting background upload for draft: ${_currentDraft!.id}',
+          category: LogCategory.video);
+
+      // Start upload in background
+      final pendingUpload = await uploadManager.startUpload(
+        videoFile: _currentDraft!.videoFile,
+        nostrPubkey: pubkey,
+        title: _currentDraft!.title,
+        description: _currentDraft!.description,
+        hashtags: _currentDraft!.hashtags,
+        videoDuration: _videoController?.value.duration ?? Duration.zero,
+        proofManifest: _currentDraft!.proofManifest,
+      );
+
+      // Store upload ID in state
+      if (mounted) {
+        setState(() {
+          _backgroundUploadId = pendingUpload.id;
+          _uploadStatus = pendingUpload.status;
+        });
+      }
+
+      Log.info('📝 Background upload started: ${pendingUpload.id}',
+          category: LogCategory.video);
+    } catch (e) {
+      Log.error('📝 Failed to start background upload: $e',
+          category: LogCategory.video);
+    }
+  }
+
+  /// Cancel background upload if still in progress (Task 3)
+  Future<void> _cancelBackgroundUpload() async {
+    if (_backgroundUploadId == null) {
+      return;
+    }
+
+    try {
+      final uploadManager = ref.read(uploadManagerProvider);
+      final upload = uploadManager.getUpload(_backgroundUploadId!);
+
+      if (upload == null) {
+        Log.info('📝 Upload already removed: $_backgroundUploadId',
+            category: LogCategory.video);
+        return;
+      }
+
+      // Only cancel if upload is still in progress
+      if (upload.status == UploadStatus.uploading ||
+          upload.status == UploadStatus.processing ||
+          upload.status == UploadStatus.pending ||
+          upload.status == UploadStatus.retrying) {
+        Log.info('📝 Cancelling background upload: $_backgroundUploadId (status: ${upload.status})',
+            category: LogCategory.video);
+        await uploadManager.cancelUpload(_backgroundUploadId!);
+      } else {
+        Log.info('📝 Upload already complete, not cancelling: $_backgroundUploadId (status: ${upload.status})',
+            category: LogCategory.video);
+      }
+
+      // Cancel progress listener
+      await _uploadProgressListener?.cancel();
+      _uploadProgressListener = null;
+    } catch (e) {
+      Log.error('📝 Failed to cancel background upload: $e',
+          category: LogCategory.video);
     }
   }
 
@@ -686,6 +784,50 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
   Future<void> _publishVideo() async {
     if (_currentDraft == null) return;
 
+    // Get upload manager and check if background upload exists
+    final uploadManager = ref.read(uploadManagerProvider);
+
+    // Check if we have a background upload ID and its status
+    if (_backgroundUploadId != null) {
+      final upload = uploadManager.getUpload(_backgroundUploadId!);
+
+      if (upload != null) {
+        // Handle different upload states
+        if (upload.status == UploadStatus.uploading ||
+            upload.status == UploadStatus.processing) {
+          // Show blocking progress dialog and wait for upload to complete
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => UploadProgressDialog(
+              uploadId: _backgroundUploadId!,
+              uploadManager: uploadManager,
+            ),
+          );
+
+          // After dialog closes, check if upload succeeded
+          final completedUpload = uploadManager.getUpload(_backgroundUploadId!);
+          if (completedUpload == null || completedUpload.status == UploadStatus.failed) {
+            // Upload failed during progress dialog
+            await _showUploadErrorDialog();
+            return;
+          }
+        } else if (upload.status == UploadStatus.failed) {
+          // Show error dialog with retry option
+          final shouldRetry = await _showUploadErrorDialog();
+          if (shouldRetry) {
+            await _retryUpload();
+            // Recursively call _publishVideo after retry to check status again
+            return _publishVideo();
+          } else {
+            return; // User cancelled
+          }
+        }
+        // If status is readyToPublish, proceed with Nostr event creation below
+      }
+    }
+
+    // Original publishing logic continues here...
     setState(() {
       _isPublishing = true;
       _publishingStatus = 'Preparing to publish...';
@@ -715,87 +857,24 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
         throw Exception('Not authenticated - cannot publish video');
       }
 
-      // Get upload manager and video event publisher
-      final uploadManager = ref.read(uploadManagerProvider);
+      // Get video event publisher
       final videoEventPublisher = ref.read(videoEventPublisherProvider);
 
-      // Ensure upload manager is initialized
-      if (!uploadManager.isInitialized) {
-        Log.info('📝 Initializing upload manager...',
-            category: LogCategory.video);
-        setState(() {
-          _publishingStatus = 'Initializing upload system...';
-        });
-        await uploadManager.initialize();
-      }
-
-      // Start upload to Blossom
-      Log.info('📝 Starting upload to Blossom server...',
-          category: LogCategory.video);
-
-      // Debug: Check if draft has ProofMode data
-      final hasProofMode = _currentDraft!.hasProofMode;
-      final proofManifest = _currentDraft!.proofManifest;
-      Log.info('📜 Draft hasProofMode: $hasProofMode, proofManifest: ${proofManifest != null ? "present" : "null"}',
-          category: LogCategory.video);
-      if (hasProofMode && proofManifest == null) {
-        Log.error('📜 WARNING: Draft has proofManifestJson but proofManifest getter returned null - deserialization failed!',
-            category: LogCategory.video);
-      }
-      if (proofManifest != null) {
-        Log.info('📜 ProofManifest has ${proofManifest.segments.length} segments, deviceAttestation: ${proofManifest.deviceAttestation != null}, pgpSignature: ${proofManifest.pgpSignature != null}',
-            category: LogCategory.video);
-      }
-
-      setState(() {
-        _publishingStatus = 'Uploading video...';
-      });
-
-      final pendingUpload = await uploadManager.startUpload(
-        videoFile: _currentDraft!.videoFile,
-        nostrPubkey: pubkey,
-        title: _titleController.text.trim().isEmpty
-            ? null
-            : _titleController.text.trim(),
-        description: _descriptionController.text.trim().isEmpty
-            ? null
-            : _descriptionController.text.trim(),
-        hashtags: _hashtags.isEmpty ? null : _hashtags,
-        videoDuration: _videoController?.value.duration ?? Duration.zero,
-        proofManifest: proofManifest,
-      );
-
-      Log.info('📝 Upload started, ID: ${pendingUpload.id}',
-          category: LogCategory.video);
-
-      // Track upload progress
-      setState(() {
-        _currentUploadId = pendingUpload.id;
-      });
-
-      // Poll for upload progress
-      while (mounted && _currentUploadId != null) {
-        final upload = uploadManager.getUpload(_currentUploadId!);
-        if (upload == null) break;
-
-        final progress = upload.uploadProgress ?? 0.0;
-        if (mounted) {
-          setState(() {
-            _uploadProgress = progress;
-            if (progress < 1.0) {
-              _publishingStatus = 'Uploading video... ${(progress * 100).toInt()}%';
-            }
-          });
+      // Use existing upload if available, otherwise start new upload
+      PendingUpload pendingUpload;
+      if (_backgroundUploadId != null) {
+        final existingUpload = uploadManager.getUpload(_backgroundUploadId!);
+        if (existingUpload != null && existingUpload.status == UploadStatus.readyToPublish) {
+          pendingUpload = existingUpload;
+          Log.info('📝 Using existing background upload: ${pendingUpload.id}',
+              category: LogCategory.video);
+        } else {
+          // Background upload not ready, start new upload
+          pendingUpload = await _startNewUpload(uploadManager, pubkey);
         }
-
-        // If upload is complete or failed, stop polling
-        if (upload.status == UploadStatus.readyToPublish ||
-            upload.status == UploadStatus.failed ||
-            upload.status == UploadStatus.processing) {
-          break;
-        }
-
-        await Future.delayed(const Duration(milliseconds: 100));
+      } else {
+        // No background upload, start new upload
+        pendingUpload = await _startNewUpload(uploadManager, pubkey);
       }
 
       // Publish Nostr event
@@ -1015,5 +1094,183 @@ Video: ${_currentDraft?.videoFile.path ?? 'Unknown'}
         );
       }
     }
+  }
+
+  /// Show error dialog when upload has failed
+  /// Returns true if user wants to retry, false if cancelled
+  Future<bool> _showUploadErrorDialog() async {
+    final uploadManager = ref.read(uploadManagerProvider);
+    final upload = _backgroundUploadId != null
+        ? uploadManager.getUpload(_backgroundUploadId!)
+        : null;
+
+    final errorMessage = upload?.errorMessage ?? 'Unknown error';
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Upload Failed',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Upload failed: $errorMessage\n\nWould you like to retry?',
+          style: const TextStyle(color: Colors.white),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              backgroundColor: VineTheme.vineGreen,
+            ),
+            child: const Text('Retry', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    return result ?? false;
+  }
+
+  /// Retry a failed upload
+  Future<void> _retryUpload() async {
+    if (_backgroundUploadId == null) return;
+
+    final uploadManager = ref.read(uploadManagerProvider);
+
+    setState(() {
+      _isPublishing = true;
+      _publishingStatus = 'Retrying upload...';
+    });
+
+    try {
+      await uploadManager.retryUpload(_backgroundUploadId!);
+
+      // Show progress dialog while retrying
+      if (mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => UploadProgressDialog(
+            uploadId: _backgroundUploadId!,
+            uploadManager: uploadManager,
+          ),
+        );
+      }
+    } catch (e) {
+      Log.error('📝 Failed to retry upload: $e', category: LogCategory.video);
+      if (mounted) {
+        setState(() {
+          _isPublishing = false;
+          _publishingStatus = '';
+        });
+      }
+      rethrow;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPublishing = false;
+          _publishingStatus = '';
+        });
+      }
+    }
+  }
+
+  /// Start a new upload and poll for progress
+  Future<PendingUpload> _startNewUpload(UploadManager uploadManager, String pubkey) async {
+    // Ensure upload manager is initialized
+    if (!uploadManager.isInitialized) {
+      Log.info('📝 Initializing upload manager...',
+          category: LogCategory.video);
+      setState(() {
+        _publishingStatus = 'Initializing upload system...';
+      });
+      await uploadManager.initialize();
+    }
+
+    // Start upload to Blossom
+    Log.info('📝 Starting upload to Blossom server...',
+        category: LogCategory.video);
+
+    // Debug: Check if draft has ProofMode data
+    final hasProofMode = _currentDraft!.hasProofMode;
+    final proofManifest = _currentDraft!.proofManifest;
+    Log.info('📜 Draft hasProofMode: $hasProofMode, proofManifest: ${proofManifest != null ? "present" : "null"}',
+        category: LogCategory.video);
+    if (hasProofMode && proofManifest == null) {
+      Log.error('📜 WARNING: Draft has proofManifestJson but proofManifest getter returned null - deserialization failed!',
+          category: LogCategory.video);
+    }
+    if (proofManifest != null) {
+      Log.info('📜 ProofManifest has ${proofManifest.segments.length} segments, deviceAttestation: ${proofManifest.deviceAttestation != null}, pgpSignature: ${proofManifest.pgpSignature != null}',
+          category: LogCategory.video);
+    }
+
+    setState(() {
+      _publishingStatus = 'Uploading video...';
+    });
+
+    final pendingUpload = await uploadManager.startUpload(
+      videoFile: _currentDraft!.videoFile,
+      nostrPubkey: pubkey,
+      title: _titleController.text.trim().isEmpty
+          ? null
+          : _titleController.text.trim(),
+      description: _descriptionController.text.trim().isEmpty
+          ? null
+          : _descriptionController.text.trim(),
+      hashtags: _hashtags.isEmpty ? null : _hashtags,
+      videoDuration: _videoController?.value.duration ?? Duration.zero,
+      proofManifest: proofManifest,
+    );
+
+    Log.info('📝 Upload started, ID: ${pendingUpload.id}',
+        category: LogCategory.video);
+
+    // Track upload progress
+    setState(() {
+      _currentUploadId = pendingUpload.id;
+    });
+
+    // Poll for upload progress
+    while (mounted && _currentUploadId != null) {
+      final upload = uploadManager.getUpload(_currentUploadId!);
+      if (upload == null) break;
+
+      final progress = upload.uploadProgress ?? 0.0;
+      if (mounted) {
+        setState(() {
+          _uploadProgress = progress;
+          if (progress < 1.0) {
+            _publishingStatus = 'Uploading video... ${(progress * 100).toInt()}%';
+          }
+        });
+      }
+
+      // If upload is complete or failed, stop polling
+      if (upload.status == UploadStatus.readyToPublish ||
+          upload.status == UploadStatus.failed ||
+          upload.status == UploadStatus.processing) {
+        break;
+      }
+
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+
+    return pendingUpload;
   }
 }

@@ -3,15 +3,11 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openvine/services/proofmode_key_service.dart';
-import 'package:openvine/services/proofmode_config.dart';
-import 'package:openvine/services/feature_flag_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../helpers/test_helpers.dart';
 
 void main() {
   group('ProofModeKeyService - Real PGP Implementation', () {
     late ProofModeKeyService keyService;
-    late TestFeatureFlagService testFlagService;
 
     setUpAll(() async {
       await setupTestEnvironment();
@@ -19,11 +15,8 @@ void main() {
 
     setUp(() async {
       keyService = ProofModeKeyService(secureStorage: MockSecureStorage());
-      testFlagService = await TestFeatureFlagService.create();
-      ProofModeConfig.initialize(testFlagService);
 
       // Enable crypto for all tests
-      testFlagService.setFlag('proofmode_crypto', true);
 
       // Clear any existing keys
       try {
@@ -277,30 +270,3 @@ void main() {
   });
 }
 
-/// Test implementation of FeatureFlagService for testing
-class TestFeatureFlagService extends FeatureFlagService {
-  final Map<String, bool> _flags = {};
-
-  TestFeatureFlagService._()
-      : super(
-          apiBaseUrl: 'test',
-          prefs: _testPrefs!,
-        );
-
-  static SharedPreferences? _testPrefs;
-
-  static Future<TestFeatureFlagService> create() async {
-    _testPrefs = await getTestSharedPreferences();
-    return TestFeatureFlagService._();
-  }
-
-  void setFlag(String name, bool enabled) {
-    _flags[name] = enabled;
-  }
-
-  @override
-  Future<bool> isEnabled(String flagName,
-      {Map<String, dynamic>? attributes, bool forceRefresh = false}) async {
-    return _flags[flagName] ?? false;
-  }
-}

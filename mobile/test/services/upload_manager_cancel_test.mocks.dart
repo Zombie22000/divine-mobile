@@ -10,7 +10,6 @@ import 'package:dio/dio.dart' as _i4;
 import 'package:mockito/mockito.dart' as _i1;
 import 'package:openvine/services/auth_service.dart' as _i2;
 import 'package:openvine/services/blossom_upload_service.dart' as _i5;
-import 'package:openvine/services/circuit_breaker_service.dart' as _i8;
 import 'package:openvine/services/nostr_service_interface.dart' as _i3;
 
 // ignore_for_file: type=lint
@@ -199,86 +198,4 @@ class MockBlossomUploadService extends _i1.Mock
             returnValue: _i6.Future<String?>.value(),
           )
           as _i6.Future<String?>);
-}
-
-/// A class which mocks [VideoCircuitBreaker].
-///
-/// See the documentation for Mockito's code generation for more information.
-class MockVideoCircuitBreaker extends _i1.Mock
-    implements _i8.VideoCircuitBreaker {
-  MockVideoCircuitBreaker() {
-    _i1.throwOnMissingStub(this);
-  }
-
-  @override
-  _i8.CircuitBreakerState get state =>
-      (super.noSuchMethod(
-            Invocation.getter(#state),
-            returnValue: _i8.CircuitBreakerState.closed,
-          )
-          as _i8.CircuitBreakerState);
-
-  @override
-  bool get allowRequests =>
-      (super.noSuchMethod(Invocation.getter(#allowRequests), returnValue: false)
-          as bool);
-
-  @override
-  double get failureRate =>
-      (super.noSuchMethod(Invocation.getter(#failureRate), returnValue: 0.0)
-          as double);
-
-  @override
-  bool shouldAllowUrl(String? url) =>
-      (super.noSuchMethod(
-            Invocation.method(#shouldAllowUrl, [url]),
-            returnValue: false,
-          )
-          as bool);
-
-  @override
-  void recordSuccess(String? url) => super.noSuchMethod(
-    Invocation.method(#recordSuccess, [url]),
-    returnValueForMissingStub: null,
-  );
-
-  @override
-  void recordFailure(String? url, String? errorMessage) => super.noSuchMethod(
-    Invocation.method(#recordFailure, [url, errorMessage]),
-    returnValueForMissingStub: null,
-  );
-
-  @override
-  Map<String, dynamic> getStats() =>
-      (super.noSuchMethod(
-            Invocation.method(#getStats, []),
-            returnValue: <String, dynamic>{},
-          )
-          as Map<String, dynamic>);
-
-  @override
-  Map<String, dynamic> getDetailedStats() =>
-      (super.noSuchMethod(
-            Invocation.method(#getDetailedStats, []),
-            returnValue: <String, dynamic>{},
-          )
-          as Map<String, dynamic>);
-
-  @override
-  void reset() => super.noSuchMethod(
-    Invocation.method(#reset, []),
-    returnValueForMissingStub: null,
-  );
-
-  @override
-  void clearPermanentFailures() => super.noSuchMethod(
-    Invocation.method(#clearPermanentFailures, []),
-    returnValueForMissingStub: null,
-  );
-
-  @override
-  void dispose() => super.noSuchMethod(
-    Invocation.method(#dispose, []),
-    returnValueForMissingStub: null,
-  );
 }

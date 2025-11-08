@@ -5,9 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openvine/services/proofmode_session_service.dart';
 import 'package:openvine/services/proofmode_key_service.dart';
 import 'package:openvine/services/proofmode_attestation_service.dart';
-import 'package:openvine/services/proofmode_config.dart';
-import 'package:openvine/services/feature_flag_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../helpers/test_helpers.dart';
 import 'dart:typed_data';
 
@@ -16,7 +13,6 @@ void main() {
     late ProofModeSessionService sessionService;
     late TestProofModeKeyService testKeyService;
     late TestProofModeAttestationService testAttestationService;
-    late TestFeatureFlagService testFlagService;
 
     setUpAll(() async {
       await setupTestEnvironment();
@@ -25,11 +21,9 @@ void main() {
     setUp(() async {
       testKeyService = TestProofModeKeyService();
       testAttestationService = TestProofModeAttestationService();
-      testFlagService = await TestFeatureFlagService.create();
 
       sessionService =
           ProofModeSessionService(testKeyService, testAttestationService);
-      ProofModeConfig.initialize(testFlagService);
     });
 
     tearDown(() async {
@@ -38,7 +32,6 @@ void main() {
 
     group('Session Management', () {
       test('should start session when capture enabled', () async {
-        testFlagService.setFlag('proofmode_capture', true);
 
         final sessionId = await sessionService.startSession();
 
@@ -48,18 +41,7 @@ void main() {
         expect(sessionService.currentSessionId, equals(sessionId));
       });
 
-      test('should not start session when capture disabled', () async {
-        testFlagService.setFlag('proofmode_capture', false);
-
-        final sessionId = await sessionService.startSession();
-
-        expect(sessionId, isNull);
-        expect(sessionService.hasActiveSession, isFalse);
-        expect(sessionService.currentSessionId, isNull);
-      });
-
       test('should generate unique session IDs', () async {
-        testFlagService.setFlag('proofmode_capture', true);
 
         final sessionId1 = await sessionService.startSession();
         await sessionService.cancelSession();
@@ -69,7 +51,6 @@ void main() {
       });
 
       test('should include device attestation in session', () async {
-        testFlagService.setFlag('proofmode_capture', true);
         testAttestationService.setMockAttestation(DeviceAttestation(
           token: 'test_token',
           platform: 'test',
@@ -84,7 +65,6 @@ void main() {
       });
 
       test('should cancel session successfully', () async {
-        testFlagService.setFlag('proofmode_capture', true);
 
         await sessionService.startSession();
         expect(sessionService.hasActiveSession, isTrue);
@@ -97,7 +77,6 @@ void main() {
 
     group('Recording Segments', () {
       test('should start recording segment in active session', () async {
-        testFlagService.setFlag('proofmode_capture', true);
 
         await sessionService.startSession();
         await sessionService.startRecordingSegment();
@@ -112,7 +91,6 @@ void main() {
       });
 
       test('should stop recording segment successfully', () async {
-        testFlagService.setFlag('proofmode_capture', true);
 
         await sessionService.startSession();
         await sessionService.startRecordingSegment();
@@ -123,7 +101,6 @@ void main() {
       });
 
       test('should handle multiple recording segments', () async {
-        testFlagService.setFlag('proofmode_capture', true);
 
         await sessionService.startSession();
 
@@ -143,7 +120,6 @@ void main() {
       });
 
       test('should add frame hashes during recording', () async {
-        testFlagService.setFlag('proofmode_capture', true);
 
         await sessionService.startSession();
         await sessionService.startRecordingSegment();
@@ -164,7 +140,6 @@ void main() {
       });
 
       test('should not add frame hashes when not recording', () async {
-        testFlagService.setFlag('proofmode_capture', true);
 
         await sessionService.startSession();
 
@@ -179,7 +154,6 @@ void main() {
 
     group('User Interactions', () {
       test('should record user interactions', () async {
-        testFlagService.setFlag('proofmode_capture', true);
 
         await sessionService.startSession();
 
@@ -207,7 +181,6 @@ void main() {
       });
 
       test('should record coordinates correctly', () async {
-        testFlagService.setFlag('proofmode_capture', true);
 
         await sessionService.startSession();
         await sessionService.recordInteraction('touch', 0.123, 0.456);
@@ -223,7 +196,6 @@ void main() {
 
     group('Session Finalization', () {
       test('should finalize session and generate proof manifest', () async {
-        testFlagService.setFlag('proofmode_capture', true);
         testKeyService.setMockSignature(ProofSignature(
           signature: 'test_signature',
           publicKeyFingerprint: 'test_fingerprint',
@@ -253,7 +225,6 @@ void main() {
       });
 
       test('should calculate session durations correctly', () async {
-        testFlagService.setFlag('proofmode_capture', true);
 
         await sessionService.startSession();
 
@@ -275,7 +246,6 @@ void main() {
       });
 
       test('should handle finalization without recording segments', () async {
-        testFlagService.setFlag('proofmode_capture', true);
 
         await sessionService.startSession();
         await sessionService.recordInteraction('cancel', 0.5, 0.5);
@@ -295,7 +265,6 @@ void main() {
       });
 
       test('should clear session after finalization', () async {
-        testFlagService.setFlag('proofmode_capture', true);
 
         await sessionService.startSession();
         expect(sessionService.hasActiveSession, isTrue);
@@ -309,7 +278,6 @@ void main() {
     group('JSON Serialization', () {
       test('should serialize and deserialize ProofManifest correctly',
           () async {
-        testFlagService.setFlag('proofmode_capture', true);
         testKeyService.setMockSignature(ProofSignature(
           signature: 'test_sig',
           publicKeyFingerprint: 'test_fp',
@@ -341,7 +309,6 @@ void main() {
       });
 
       test('should serialize segment data correctly', () async {
-        testFlagService.setFlag('proofmode_capture', true);
 
         await sessionService.startSession();
         await sessionService.startRecordingSegment();
@@ -365,7 +332,6 @@ void main() {
 
     group('Error Handling', () {
       test('should handle key service errors gracefully', () async {
-        testFlagService.setFlag('proofmode_capture', true);
         testKeyService.setShouldThrowError(true);
 
         await sessionService.startSession();
@@ -377,7 +343,6 @@ void main() {
       });
 
       test('should handle attestation service errors gracefully', () async {
-        testFlagService.setFlag('proofmode_capture', true);
         testAttestationService.setShouldThrowError(true);
 
         final sessionId = await sessionService.startSession();
@@ -436,30 +401,3 @@ class TestProofModeAttestationService extends ProofModeAttestationService {
   }
 }
 
-/// Test implementation of FeatureFlagService
-class TestFeatureFlagService extends FeatureFlagService {
-  final Map<String, bool> _flags = {};
-
-  TestFeatureFlagService._()
-      : super(
-          apiBaseUrl: 'test',
-          prefs: _testPrefs!,
-        );
-
-  static SharedPreferences? _testPrefs;
-
-  static Future<TestFeatureFlagService> create() async {
-    _testPrefs = await getTestSharedPreferences();
-    return TestFeatureFlagService._();
-  }
-
-  void setFlag(String name, bool enabled) {
-    _flags[name] = enabled;
-  }
-
-  @override
-  Future<bool> isEnabled(String flagName,
-      {Map<String, dynamic>? attributes, bool forceRefresh = false}) async {
-    return _flags[flagName] ?? false;
-  }
-}

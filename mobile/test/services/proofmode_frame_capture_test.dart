@@ -6,27 +6,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openvine/services/proofmode_session_service.dart';
 import 'package:openvine/services/proofmode_key_service.dart';
 import 'package:openvine/services/proofmode_attestation_service.dart';
-import 'package:openvine/services/proofmode_config.dart';
-import 'package:openvine/services/feature_flag_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../helpers/test_helpers.dart';
 
 void main() {
   group('ProofMode Frame Capture', () {
     late ProofModeSessionService sessionService;
-    late TestFeatureFlagService testFlagService;
 
     setUpAll(() async {
       await setupTestEnvironment();
     });
 
     setUp(() async {
-      testFlagService = await TestFeatureFlagService.create();
-      ProofModeConfig.initialize(testFlagService);
 
       // Enable crypto for all tests
-      testFlagService.setFlag('proofmode_crypto', true);
-      testFlagService.setFlag('proofmode_capture', true);
 
       final keyService = ProofModeKeyService();
       final attestationService = ProofModeAttestationService();
@@ -201,18 +193,13 @@ void main() {
 
   group('ProofMode Frame Capture Performance', () {
     late ProofModeSessionService sessionService;
-    late TestFeatureFlagService testFlagService;
 
     setUpAll(() async {
       await setupTestEnvironment();
     });
 
     setUp(() async {
-      testFlagService = await TestFeatureFlagService.create();
-      ProofModeConfig.initialize(testFlagService);
 
-      testFlagService.setFlag('proofmode_crypto', true);
-      testFlagService.setFlag('proofmode_capture', true);
 
       final keyService = ProofModeKeyService();
       final attestationService = ProofModeAttestationService();
@@ -257,28 +244,3 @@ void main() {
   });
 }
 
-/// Test implementation of FeatureFlagService for testing
-class TestFeatureFlagService extends FeatureFlagService {
-  final Map<String, bool> _flags = {};
-
-  TestFeatureFlagService._(SharedPreferences prefs)
-      : super(
-          apiBaseUrl: 'test',
-          prefs: prefs,
-        );
-
-  static Future<TestFeatureFlagService> create() async {
-    final prefs = await getTestSharedPreferences();
-    return TestFeatureFlagService._(prefs);
-  }
-
-  void setFlag(String name, bool enabled) {
-    _flags[name] = enabled;
-  }
-
-  @override
-  Future<bool> isEnabled(String flagName,
-      {Map<String, dynamic>? attributes, bool forceRefresh = false}) async {
-    return _flags[flagName] ?? false;
-  }
-}

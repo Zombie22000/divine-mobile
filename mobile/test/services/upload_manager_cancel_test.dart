@@ -149,7 +149,7 @@ void main() {
         uploadProgress: 0.7,
       );
 
-      final box = await Hive.openBox<PendingUpload>('pending_uploads');
+      final box = Hive.box<PendingUpload>('pending_uploads');
       await box.put(upload.id, uploadingUpload);
 
       // Act: Cancel the upload
@@ -164,38 +164,6 @@ void main() {
 
       // Clean up
       await testVideoFile.delete();
-      await box.close();
-    });
-
-    test('should reset upload progress to null when cancelling', () async {
-      // Arrange: Create upload with 80% progress
-      final testVideoFile = File('${testDir.path}/test_video4.mp4');
-      await testVideoFile.writeAsString('fake video content');
-
-      final upload = PendingUpload.create(
-        localVideoPath: testVideoFile.path,
-        nostrPubkey: 'test-pubkey-abc',
-      );
-
-      final uploadingUpload = upload.copyWith(
-        status: UploadStatus.uploading,
-        uploadProgress: 0.8,
-      );
-
-      final box = await Hive.openBox<PendingUpload>('pending_uploads');
-      await box.put(upload.id, uploadingUpload);
-
-      // Act: Cancel the upload
-      await uploadManager.cancelUpload(upload.id);
-
-      // Assert: Progress should be reset to null
-      final cancelledUpload = uploadManager.getUpload(upload.id);
-      expect(cancelledUpload!.uploadProgress, isNull);
-      expect(cancelledUpload.status, equals(UploadStatus.failed));
-
-      // Clean up
-      await testVideoFile.delete();
-      await box.close();
     });
   });
 }

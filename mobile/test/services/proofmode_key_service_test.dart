@@ -3,15 +3,11 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openvine/services/proofmode_key_service.dart';
-import 'package:openvine/services/proofmode_config.dart';
-import 'package:openvine/services/feature_flag_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../helpers/test_helpers.dart';
 
 void main() {
   group('ProofModeKeyService', () {
     late ProofModeKeyService keyService;
-    late TestFeatureFlagService testFlagService;
     late MockSecureStorage sharedStorage; // Shared across service instances for persistence tests
 
     setUpAll(() async {
@@ -21,8 +17,6 @@ void main() {
     setUp(() async {
       sharedStorage = MockSecureStorage();
       keyService = ProofModeKeyService(secureStorage: sharedStorage);
-      testFlagService = await TestFeatureFlagService.create();
-      ProofModeConfig.initialize(testFlagService);
 
       // Clear any existing keys
       try {
@@ -42,7 +36,6 @@ void main() {
 
     group('Initialization', () {
       test('should initialize without crypto enabled', () async {
-        testFlagService.setFlag('proofmode_crypto', false);
 
         // Should not throw and should not generate keys
         await keyService.initialize();
@@ -53,7 +46,6 @@ void main() {
 
       test('should generate keys when crypto enabled and no existing keys',
           () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         await keyService.initialize();
 
@@ -67,7 +59,6 @@ void main() {
       });
 
       test('should not regenerate keys if they already exist', () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         // First initialization
         await keyService.initialize();
@@ -84,7 +75,6 @@ void main() {
 
     group('Key Generation', () {
       test('should generate unique key pairs', () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         final keyPair1 = await keyService.generateKeyPair();
         await keyService.deleteKeys();
@@ -96,7 +86,6 @@ void main() {
       });
 
       test('should generate key pair with correct format', () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         final keyPair = await keyService.generateKeyPair();
 
@@ -113,7 +102,6 @@ void main() {
       });
 
       test('should store generated keys securely', () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         final originalKeyPair = await keyService.generateKeyPair();
 
@@ -136,7 +124,6 @@ void main() {
       });
 
       test('should cache key pair after first retrieval', () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         await keyService.generateKeyPair();
 
@@ -151,7 +138,6 @@ void main() {
       });
 
       test('should return public key fingerprint correctly', () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         final keyPair = await keyService.generateKeyPair();
         final fingerprint = await keyService.getPublicKeyFingerprint();
@@ -167,7 +153,6 @@ void main() {
 
     group('Data Signing', () {
       test('should sign data successfully when crypto enabled', () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         await keyService.generateKeyPair();
         const testData = 'test data to sign';
@@ -184,7 +169,6 @@ void main() {
       });
 
       test('should return null when crypto disabled', () async {
-        testFlagService.setFlag('proofmode_crypto', false);
 
         const testData = 'test data to sign';
         final signature = await keyService.signData(testData);
@@ -193,7 +177,6 @@ void main() {
       });
 
       test('should return null when no keys available', () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         const testData = 'test data to sign';
         final signature = await keyService.signData(testData);
@@ -202,7 +185,6 @@ void main() {
       });
 
       test('should generate non-deterministic signatures (includes timestamp)', () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         await keyService.generateKeyPair();
         const testData = 'consistent test data';
@@ -227,7 +209,6 @@ void main() {
       });
 
       test('should generate different signatures for different data', () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         await keyService.generateKeyPair();
 
@@ -242,7 +223,6 @@ void main() {
 
     group('Signature Verification', () {
       test('should verify valid signature successfully', () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         await keyService.generateKeyPair();
         const testData = 'data to verify';
@@ -254,7 +234,6 @@ void main() {
       });
 
       test('should reject invalid signature', () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         await keyService.generateKeyPair();
         const originalData = 'original data';
@@ -268,7 +247,6 @@ void main() {
       });
 
       test('should reject signature with wrong fingerprint', () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         await keyService.generateKeyPair();
         const testData = 'test data';
@@ -289,7 +267,6 @@ void main() {
 
       test('should return false when no keys available for verification',
           () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         final fakeSignature = ProofSignature(
           signature: 'fake_signature',
@@ -305,7 +282,6 @@ void main() {
 
     group('Key Deletion', () {
       test('should delete all keys successfully', () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         await keyService.generateKeyPair();
         expect(await keyService.getKeyPair(), isNotNull);
@@ -315,7 +291,6 @@ void main() {
       });
 
       test('should clear cache when keys deleted', () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         await keyService.generateKeyPair();
         await keyService.getKeyPair(); // Cache the keys
@@ -335,7 +310,6 @@ void main() {
     group('JSON Serialization', () {
       test('should serialize and deserialize ProofModeKeyPair correctly',
           () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         final originalKeyPair = await keyService.generateKeyPair();
         final json = originalKeyPair.toJson();
@@ -353,7 +327,6 @@ void main() {
 
       test('should serialize and deserialize ProofSignature correctly',
           () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         await keyService.generateKeyPair();
         final originalSignature = await keyService.signData('test data');
@@ -372,7 +345,6 @@ void main() {
 
     group('Error Handling', () {
       test('should handle secure storage errors gracefully', () async {
-        testFlagService.setFlag('proofmode_crypto', true);
 
         // This test would require mocking FlutterSecureStorage to throw errors
         // For now, just ensure the service doesn't crash
@@ -388,30 +360,3 @@ void main() {
   });
 }
 
-/// Test implementation of FeatureFlagService for testing
-class TestFeatureFlagService extends FeatureFlagService {
-  final Map<String, bool> _flags = {};
-
-  TestFeatureFlagService._()
-      : super(
-          apiBaseUrl: 'test',
-          prefs: _testPrefs!,
-        );
-
-  static SharedPreferences? _testPrefs;
-
-  static Future<TestFeatureFlagService> create() async {
-    _testPrefs = await getTestSharedPreferences();
-    return TestFeatureFlagService._();
-  }
-
-  void setFlag(String name, bool enabled) {
-    _flags[name] = enabled;
-  }
-
-  @override
-  Future<bool> isEnabled(String flagName,
-      {Map<String, dynamic>? attributes, bool forceRefresh = false}) async {
-    return _flags[flagName] ?? false;
-  }
-}
