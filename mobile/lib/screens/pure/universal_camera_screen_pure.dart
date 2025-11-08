@@ -471,10 +471,11 @@ class _UniversalCameraScreenPureState
                 !_isProcessing) {
               // Recording stopped - check if it was max duration, manual stop, or error
               if (next.hasSegments) {
-                // Check if this was an auto-stop due to max duration (remaining time near zero)
-                // vs. manual segment stop (remaining time > 1 second)
-                if (next.remainingDuration.inSeconds <= 1) {
-                  // Has segments + no remaining time = legitimate max duration auto-stop
+                // Check if this was an auto-stop due to max duration (remaining time ~0ms)
+                // vs. manual segment stop (remaining time > 50ms)
+                // With 6.3s max duration, timer should stop at exactly 0ms remaining
+                if (next.remainingDuration.inMilliseconds < 50) {
+                  // Has segments + virtually no remaining time = legitimate max duration auto-stop
                   Log.info(
                     '📹 Recording auto-stopped at max duration',
                     category: LogCategory.video,
@@ -483,7 +484,7 @@ class _UniversalCameraScreenPureState
                 } else {
                   // Has segments + time remaining = manual segment stop (user released button)
                   Log.debug(
-                    '📹 Manual segment stop (${next.remainingDuration.inSeconds}s remaining)',
+                    '📹 Manual segment stop (${next.remainingDuration.inMilliseconds}ms remaining)',
                     category: LogCategory.video,
                   );
                   // Don't show "max time reached" message for manual stops
@@ -535,7 +536,9 @@ class _UniversalCameraScreenPureState
                           // Preview widget positioned to fill the aspect ratio container
                           if (recordingState.isInitialized)
                             Positioned.fill(
-                              child: ref.read(vineRecordingProvider.notifier).previewWidget,
+                              child: ref
+                                  .read(vineRecordingProvider.notifier)
+                                  .previewWidget,
                             )
                           else
                             CameraPreviewPlaceholder(

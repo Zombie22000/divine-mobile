@@ -334,8 +334,8 @@ class VideoEventPublisher {
 
             // Add verification level tag
             final verificationLevel = getVerificationLevel(manifest);
-            tags.add(['verification', verificationLevel]);
-            Log.verbose('Added verification tag: $verificationLevel',
+            tags.add(['proof-verification-level', verificationLevel]);
+            Log.verbose('Added proof-verification-level tag: $verificationLevel',
                 name: 'VideoEventPublisher', category: LogCategory.video);
 
             // Add ProofMode manifest tag (complete JSON manifest)
@@ -347,16 +347,16 @@ class VideoEventPublisher {
             // Add device attestation tag if available
             final deviceTag = createDeviceAttestationTag(manifest);
             if (deviceTag != null) {
-              tags.add(['device_attestation', deviceTag]);
-              Log.verbose('Added device_attestation tag',
+              tags.add(['proof-device-attestation', deviceTag]);
+              Log.verbose('Added proof-device-attestation tag',
                   name: 'VideoEventPublisher', category: LogCategory.video);
             }
 
             // Add PGP fingerprint tag if available
             final pgpTag = createPgpFingerprintTag(manifest);
             if (pgpTag != null) {
-              tags.add(['pgp_fingerprint', pgpTag]);
-              Log.verbose('Added pgp_fingerprint tag: $pgpTag',
+              tags.add(['proof-pgp-fingerprint', pgpTag]);
+              Log.verbose('Added proof-pgp-fingerprint tag: $pgpTag',
                   name: 'VideoEventPublisher', category: LogCategory.video);
             }
 

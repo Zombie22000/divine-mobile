@@ -315,12 +315,17 @@ class UploadManager {
     if (proofManifest != null) {
       try {
         proofManifestJson = jsonEncode(proofManifest.toJson());
-        Log.info('📜 ProofManifest attached to upload',
+        Log.info('📜 ProofManifest attached to upload (${proofManifest.segments.length} segments, deviceAttestation: ${proofManifest.deviceAttestation != null}, pgpSignature: ${proofManifest.pgpSignature != null})',
+            name: 'UploadManager', category: LogCategory.video);
+        Log.info('📜 ProofManifest JSON length: ${proofManifestJson.length} characters',
             name: 'UploadManager', category: LogCategory.video);
       } catch (e) {
         Log.error('Failed to serialize ProofManifest: $e',
             name: 'UploadManager', category: LogCategory.video);
       }
+    } else {
+      Log.info('📜 No ProofManifest provided to upload',
+          name: 'UploadManager', category: LogCategory.video);
     }
 
     final upload = PendingUpload.create(

@@ -733,6 +733,20 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
       Log.info('📝 Starting upload to Blossom server...',
           category: LogCategory.video);
 
+      // Debug: Check if draft has ProofMode data
+      final hasProofMode = _currentDraft!.hasProofMode;
+      final proofManifest = _currentDraft!.proofManifest;
+      Log.info('📜 Draft hasProofMode: $hasProofMode, proofManifest: ${proofManifest != null ? "present" : "null"}',
+          category: LogCategory.video);
+      if (hasProofMode && proofManifest == null) {
+        Log.error('📜 WARNING: Draft has proofManifestJson but proofManifest getter returned null - deserialization failed!',
+            category: LogCategory.video);
+      }
+      if (proofManifest != null) {
+        Log.info('📜 ProofManifest has ${proofManifest.segments.length} segments, deviceAttestation: ${proofManifest.deviceAttestation != null}, pgpSignature: ${proofManifest.pgpSignature != null}',
+            category: LogCategory.video);
+      }
+
       setState(() {
         _publishingStatus = 'Uploading video...';
       });
@@ -748,7 +762,7 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
             : _descriptionController.text.trim(),
         hashtags: _hashtags.isEmpty ? null : _hashtags,
         videoDuration: _videoController?.value.duration ?? Duration.zero,
-        proofManifest: _currentDraft!.proofManifest,
+        proofManifest: proofManifest,
       );
 
       Log.info('📝 Upload started, ID: ${pendingUpload.id}',
