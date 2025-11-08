@@ -3,15 +3,16 @@
 // Do not manually edit this file.
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-import 'dart:async' as _i4;
-import 'dart:io' as _i5;
+import 'dart:async' as _i5;
+import 'dart:io' as _i6;
 
 import 'package:mockito/mockito.dart' as _i1;
+import 'package:nostr_sdk/event.dart' as _i9;
 import 'package:openvine/models/pending_upload.dart' as _i2;
-import 'package:openvine/models/vine_draft.dart' as _i8;
-import 'package:openvine/services/draft_storage_service.dart' as _i7;
-import 'package:openvine/services/proofmode_session_service.dart' as _i6;
-import 'package:openvine/services/upload_manager.dart' as _i3;
+import 'package:openvine/services/auth_service.dart' as _i3;
+import 'package:openvine/services/proofmode_session_service.dart' as _i7;
+import 'package:openvine/services/upload_manager.dart' as _i4;
+import 'package:openvine/services/user_profile_service.dart' as _i8;
 
 // ignore_for_file: type=lint
 // ignore_for_file: avoid_redundant_argument_values
@@ -32,10 +33,15 @@ class _FakePendingUpload_0 extends _i1.SmartFake implements _i2.PendingUpload {
     : super(parent, parentInvocation);
 }
 
+class _FakeAuthResult_1 extends _i1.SmartFake implements _i3.AuthResult {
+  _FakeAuthResult_1(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
 /// A class which mocks [UploadManager].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockUploadManager extends _i1.Mock implements _i3.UploadManager {
+class MockUploadManager extends _i1.Mock implements _i4.UploadManager {
   MockUploadManager() {
     _i1.throwOnMissingStub(this);
   }
@@ -70,30 +76,30 @@ class MockUploadManager extends _i1.Mock implements _i3.UploadManager {
           as Map<String, int>);
 
   @override
-  _i4.Future<void> setUploadTarget(dynamic target) =>
+  _i5.Future<void> setUploadTarget(dynamic target) =>
       (super.noSuchMethod(
             Invocation.method(#setUploadTarget, [target]),
-            returnValue: _i4.Future<void>.value(),
-            returnValueForMissingStub: _i4.Future<void>.value(),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
           )
-          as _i4.Future<void>);
+          as _i5.Future<void>);
 
   @override
-  _i4.Future<bool> isBlossomAvailable() =>
+  _i5.Future<bool> isBlossomAvailable() =>
       (super.noSuchMethod(
             Invocation.method(#isBlossomAvailable, []),
-            returnValue: _i4.Future<bool>.value(false),
+            returnValue: _i5.Future<bool>.value(false),
           )
-          as _i4.Future<bool>);
+          as _i5.Future<bool>);
 
   @override
-  _i4.Future<void> initialize() =>
+  _i5.Future<void> initialize() =>
       (super.noSuchMethod(
             Invocation.method(#initialize, []),
-            returnValue: _i4.Future<void>.value(),
-            returnValueForMissingStub: _i4.Future<void>.value(),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
           )
-          as _i4.Future<void>);
+          as _i5.Future<void>);
 
   @override
   List<_i2.PendingUpload> getUploadsByStatus(_i2.UploadStatus? status) =>
@@ -114,19 +120,19 @@ class MockUploadManager extends _i1.Mock implements _i3.UploadManager {
           as _i2.PendingUpload?);
 
   @override
-  _i4.Future<void> markUploadPublished(
+  _i5.Future<void> markUploadPublished(
     String? uploadId,
     String? nostrEventId,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#markUploadPublished, [uploadId, nostrEventId]),
-            returnValue: _i4.Future<void>.value(),
-            returnValueForMissingStub: _i4.Future<void>.value(),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
           )
-          as _i4.Future<void>);
+          as _i5.Future<void>);
 
   @override
-  _i4.Future<void> markUploadReadyToPublish(
+  _i5.Future<void> markUploadReadyToPublish(
     String? uploadId,
     String? cloudinaryPublicId,
   ) =>
@@ -135,14 +141,14 @@ class MockUploadManager extends _i1.Mock implements _i3.UploadManager {
               uploadId,
               cloudinaryPublicId,
             ]),
-            returnValue: _i4.Future<void>.value(),
-            returnValueForMissingStub: _i4.Future<void>.value(),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
           )
-          as _i4.Future<void>);
+          as _i5.Future<void>);
 
   @override
-  _i4.Future<_i2.PendingUpload> startUpload({
-    required _i5.File? videoFile,
+  _i5.Future<_i2.PendingUpload> startUpload({
+    required _i6.File? videoFile,
     required String? nostrPubkey,
     String? thumbnailPath,
     String? title,
@@ -151,7 +157,7 @@ class MockUploadManager extends _i1.Mock implements _i3.UploadManager {
     int? videoWidth,
     int? videoHeight,
     Duration? videoDuration,
-    _i6.ProofManifest? proofManifest,
+    _i7.ProofManifest? proofManifest,
   }) =>
       (super.noSuchMethod(
             Invocation.method(#startUpload, [], {
@@ -166,7 +172,7 @@ class MockUploadManager extends _i1.Mock implements _i3.UploadManager {
               #videoDuration: videoDuration,
               #proofManifest: proofManifest,
             }),
-            returnValue: _i4.Future<_i2.PendingUpload>.value(
+            returnValue: _i5.Future<_i2.PendingUpload>.value(
               _FakePendingUpload_0(
                 this,
                 Invocation.method(#startUpload, [], {
@@ -184,64 +190,64 @@ class MockUploadManager extends _i1.Mock implements _i3.UploadManager {
               ),
             ),
           )
-          as _i4.Future<_i2.PendingUpload>);
+          as _i5.Future<_i2.PendingUpload>);
 
   @override
-  _i4.Future<void> pauseUpload(String? uploadId) =>
+  _i5.Future<void> pauseUpload(String? uploadId) =>
       (super.noSuchMethod(
             Invocation.method(#pauseUpload, [uploadId]),
-            returnValue: _i4.Future<void>.value(),
-            returnValueForMissingStub: _i4.Future<void>.value(),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
           )
-          as _i4.Future<void>);
+          as _i5.Future<void>);
 
   @override
-  _i4.Future<void> resumeUpload(String? uploadId) =>
+  _i5.Future<void> resumeUpload(String? uploadId) =>
       (super.noSuchMethod(
             Invocation.method(#resumeUpload, [uploadId]),
-            returnValue: _i4.Future<void>.value(),
-            returnValueForMissingStub: _i4.Future<void>.value(),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
           )
-          as _i4.Future<void>);
+          as _i5.Future<void>);
 
   @override
-  _i4.Future<void> retryUpload(String? uploadId) =>
+  _i5.Future<void> retryUpload(String? uploadId) =>
       (super.noSuchMethod(
             Invocation.method(#retryUpload, [uploadId]),
-            returnValue: _i4.Future<void>.value(),
-            returnValueForMissingStub: _i4.Future<void>.value(),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
           )
-          as _i4.Future<void>);
+          as _i5.Future<void>);
 
   @override
-  _i4.Future<void> cancelUpload(String? uploadId) =>
+  _i5.Future<void> cancelUpload(String? uploadId) =>
       (super.noSuchMethod(
             Invocation.method(#cancelUpload, [uploadId]),
-            returnValue: _i4.Future<void>.value(),
-            returnValueForMissingStub: _i4.Future<void>.value(),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
           )
-          as _i4.Future<void>);
+          as _i5.Future<void>);
 
   @override
-  _i4.Future<void> deleteUpload(String? uploadId) =>
+  _i5.Future<void> deleteUpload(String? uploadId) =>
       (super.noSuchMethod(
             Invocation.method(#deleteUpload, [uploadId]),
-            returnValue: _i4.Future<void>.value(),
-            returnValueForMissingStub: _i4.Future<void>.value(),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
           )
-          as _i4.Future<void>);
+          as _i5.Future<void>);
 
   @override
-  _i4.Future<void> cleanupCompletedUploads() =>
+  _i5.Future<void> cleanupCompletedUploads() =>
       (super.noSuchMethod(
             Invocation.method(#cleanupCompletedUploads, []),
-            returnValue: _i4.Future<void>.value(),
-            returnValueForMissingStub: _i4.Future<void>.value(),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
           )
-          as _i4.Future<void>);
+          as _i5.Future<void>);
 
   @override
-  _i4.Future<void> updateUploadStatus(
+  _i5.Future<void> updateUploadStatus(
     String? uploadId,
     _i2.UploadStatus? status, {
     String? nostrEventId,
@@ -252,13 +258,13 @@ class MockUploadManager extends _i1.Mock implements _i3.UploadManager {
               [uploadId, status],
               {#nostrEventId: nostrEventId},
             ),
-            returnValue: _i4.Future<void>.value(),
-            returnValueForMissingStub: _i4.Future<void>.value(),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
           )
-          as _i4.Future<void>);
+          as _i5.Future<void>);
 
   @override
-  _i4.Future<void> updateUploadMetadata(
+  _i5.Future<void> updateUploadMetadata(
     String? uploadId, {
     String? title,
     String? description,
@@ -270,19 +276,19 @@ class MockUploadManager extends _i1.Mock implements _i3.UploadManager {
               [uploadId],
               {#title: title, #description: description, #hashtags: hashtags},
             ),
-            returnValue: _i4.Future<void>.value(),
-            returnValueForMissingStub: _i4.Future<void>.value(),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
           )
-          as _i4.Future<void>);
+          as _i5.Future<void>);
 
   @override
-  _i4.Future<void> cleanupProblematicUploads() =>
+  _i5.Future<void> cleanupProblematicUploads() =>
       (super.noSuchMethod(
             Invocation.method(#cleanupProblematicUploads, []),
-            returnValue: _i4.Future<void>.value(),
-            returnValueForMissingStub: _i4.Future<void>.value(),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
           )
-          as _i4.Future<void>);
+          as _i5.Future<void>);
 
   @override
   Map<String, dynamic> getPerformanceMetrics() =>
@@ -293,26 +299,26 @@ class MockUploadManager extends _i1.Mock implements _i3.UploadManager {
           as Map<String, dynamic>);
 
   @override
-  _i3.UploadMetrics? getUploadMetrics(String? uploadId) =>
+  _i4.UploadMetrics? getUploadMetrics(String? uploadId) =>
       (super.noSuchMethod(Invocation.method(#getUploadMetrics, [uploadId]))
-          as _i3.UploadMetrics?);
+          as _i4.UploadMetrics?);
 
   @override
-  List<_i3.UploadMetrics> getRecentMetrics() =>
+  List<_i4.UploadMetrics> getRecentMetrics() =>
       (super.noSuchMethod(
             Invocation.method(#getRecentMetrics, []),
-            returnValue: <_i3.UploadMetrics>[],
+            returnValue: <_i4.UploadMetrics>[],
           )
-          as List<_i3.UploadMetrics>);
+          as List<_i4.UploadMetrics>);
 
   @override
-  _i4.Future<void> retryUploadWithBackoff(String? uploadId) =>
+  _i5.Future<void> retryUploadWithBackoff(String? uploadId) =>
       (super.noSuchMethod(
             Invocation.method(#retryUploadWithBackoff, [uploadId]),
-            returnValue: _i4.Future<void>.value(),
-            returnValueForMissingStub: _i4.Future<void>.value(),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
           )
-          as _i4.Future<void>);
+          as _i5.Future<void>);
 
   @override
   void dispose() => super.noSuchMethod(
@@ -321,49 +327,189 @@ class MockUploadManager extends _i1.Mock implements _i3.UploadManager {
   );
 }
 
-/// A class which mocks [DraftStorageService].
+/// A class which mocks [AuthService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockDraftStorageService extends _i1.Mock
-    implements _i7.DraftStorageService {
-  MockDraftStorageService() {
+class MockAuthService extends _i1.Mock implements _i3.AuthService {
+  MockAuthService() {
     _i1.throwOnMissingStub(this);
   }
 
   @override
-  _i4.Future<void> saveDraft(_i8.VineDraft? draft) =>
+  _i3.AuthState get authState =>
       (super.noSuchMethod(
-            Invocation.method(#saveDraft, [draft]),
-            returnValue: _i4.Future<void>.value(),
-            returnValueForMissingStub: _i4.Future<void>.value(),
+            Invocation.getter(#authState),
+            returnValue: _i3.AuthState.unauthenticated,
           )
-          as _i4.Future<void>);
+          as _i3.AuthState);
 
   @override
-  _i4.Future<List<_i8.VineDraft>> getAllDrafts() =>
+  _i5.Stream<_i3.AuthState> get authStateStream =>
       (super.noSuchMethod(
-            Invocation.method(#getAllDrafts, []),
-            returnValue: _i4.Future<List<_i8.VineDraft>>.value(
-              <_i8.VineDraft>[],
+            Invocation.getter(#authStateStream),
+            returnValue: _i5.Stream<_i3.AuthState>.empty(),
+          )
+          as _i5.Stream<_i3.AuthState>);
+
+  @override
+  _i5.Stream<_i3.UserProfile?> get profileStream =>
+      (super.noSuchMethod(
+            Invocation.getter(#profileStream),
+            returnValue: _i5.Stream<_i3.UserProfile?>.empty(),
+          )
+          as _i5.Stream<_i3.UserProfile?>);
+
+  @override
+  bool get isAuthenticated =>
+      (super.noSuchMethod(
+            Invocation.getter(#isAuthenticated),
+            returnValue: false,
+          )
+          as bool);
+
+  @override
+  Map<String, dynamic> get userStats =>
+      (super.noSuchMethod(
+            Invocation.getter(#userStats),
+            returnValue: <String, dynamic>{},
+          )
+          as Map<String, dynamic>);
+
+  @override
+  _i5.Future<void> initialize() =>
+      (super.noSuchMethod(
+            Invocation.method(#initialize, []),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i5.Future<_i3.AuthResult> createNewIdentity({String? biometricPrompt}) =>
+      (super.noSuchMethod(
+            Invocation.method(#createNewIdentity, [], {
+              #biometricPrompt: biometricPrompt,
+            }),
+            returnValue: _i5.Future<_i3.AuthResult>.value(
+              _FakeAuthResult_1(
+                this,
+                Invocation.method(#createNewIdentity, [], {
+                  #biometricPrompt: biometricPrompt,
+                }),
+              ),
             ),
           )
-          as _i4.Future<List<_i8.VineDraft>>);
+          as _i5.Future<_i3.AuthResult>);
 
   @override
-  _i4.Future<void> deleteDraft(String? id) =>
+  _i5.Future<_i3.AuthResult> importFromNsec(
+    String? nsec, {
+    String? biometricPrompt,
+  }) =>
       (super.noSuchMethod(
-            Invocation.method(#deleteDraft, [id]),
-            returnValue: _i4.Future<void>.value(),
-            returnValueForMissingStub: _i4.Future<void>.value(),
+            Invocation.method(
+              #importFromNsec,
+              [nsec],
+              {#biometricPrompt: biometricPrompt},
+            ),
+            returnValue: _i5.Future<_i3.AuthResult>.value(
+              _FakeAuthResult_1(
+                this,
+                Invocation.method(
+                  #importFromNsec,
+                  [nsec],
+                  {#biometricPrompt: biometricPrompt},
+                ),
+              ),
+            ),
           )
-          as _i4.Future<void>);
+          as _i5.Future<_i3.AuthResult>);
 
   @override
-  _i4.Future<void> clearAllDrafts() =>
+  _i5.Future<_i3.AuthResult> importFromHex(
+    String? privateKeyHex, {
+    String? biometricPrompt,
+  }) =>
       (super.noSuchMethod(
-            Invocation.method(#clearAllDrafts, []),
-            returnValue: _i4.Future<void>.value(),
-            returnValueForMissingStub: _i4.Future<void>.value(),
+            Invocation.method(
+              #importFromHex,
+              [privateKeyHex],
+              {#biometricPrompt: biometricPrompt},
+            ),
+            returnValue: _i5.Future<_i3.AuthResult>.value(
+              _FakeAuthResult_1(
+                this,
+                Invocation.method(
+                  #importFromHex,
+                  [privateKeyHex],
+                  {#biometricPrompt: biometricPrompt},
+                ),
+              ),
+            ),
           )
-          as _i4.Future<void>);
+          as _i5.Future<_i3.AuthResult>);
+
+  @override
+  _i5.Future<void> refreshCurrentProfile(
+    _i8.UserProfileService? userProfileService,
+  ) =>
+      (super.noSuchMethod(
+            Invocation.method(#refreshCurrentProfile, [userProfileService]),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i5.Future<void> signOut({bool? deleteKeys = false}) =>
+      (super.noSuchMethod(
+            Invocation.method(#signOut, [], {#deleteKeys: deleteKeys}),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i5.Future<String?> getPrivateKeyForSigning({String? biometricPrompt}) =>
+      (super.noSuchMethod(
+            Invocation.method(#getPrivateKeyForSigning, [], {
+              #biometricPrompt: biometricPrompt,
+            }),
+            returnValue: _i5.Future<String?>.value(),
+          )
+          as _i5.Future<String?>);
+
+  @override
+  _i5.Future<String?> exportNsec({String? biometricPrompt}) =>
+      (super.noSuchMethod(
+            Invocation.method(#exportNsec, [], {
+              #biometricPrompt: biometricPrompt,
+            }),
+            returnValue: _i5.Future<String?>.value(),
+          )
+          as _i5.Future<String?>);
+
+  @override
+  _i5.Future<_i9.Event?> createAndSignEvent({
+    required int? kind,
+    required String? content,
+    List<List<String>>? tags,
+    String? biometricPrompt,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#createAndSignEvent, [], {
+              #kind: kind,
+              #content: content,
+              #tags: tags,
+              #biometricPrompt: biometricPrompt,
+            }),
+            returnValue: _i5.Future<_i9.Event?>.value(),
+          )
+          as _i5.Future<_i9.Event?>);
+
+  @override
+  void dispose() => super.noSuchMethod(
+    Invocation.method(#dispose, []),
+    returnValueForMissingStub: null,
+  );
 }

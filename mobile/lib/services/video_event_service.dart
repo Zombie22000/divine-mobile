@@ -2818,6 +2818,15 @@ class VideoEventService extends ChangeNotifier {
       return; // Don't resurrect deleted videos
     }
 
+    // NIP-40: Filter out expired events
+    if (videoEvent.isExpired) {
+      Log.debug(
+          'Filtering out expired video ${videoEvent.id} from $subscriptionType feed (expired: ${videoEvent.expirationTimestamp})',
+          name: 'VideoEventService',
+          category: LogCategory.video);
+      return; // Don't add expired events per NIP-40
+    }
+
     // CRITICAL: Validate that video has an accessible URL before adding to feed
     if (!_hasValidVideoUrl(videoEvent)) {
       Log.warning(

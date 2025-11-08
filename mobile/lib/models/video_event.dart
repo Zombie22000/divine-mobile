@@ -42,6 +42,7 @@ class VideoEvent {
     this.originalLikes,
     this.originalComments,
     this.originalReposts,
+    this.expirationTimestamp,
   });
 
   /// Create VideoEvent from Nostr event
@@ -79,6 +80,7 @@ class VideoEvent {
     int? originalLikes;
     int? originalComments;
     int? originalReposts;
+    int? expirationTimestamp;
 
     // Parse event tags according to NIP-71
     // Handle both List<String> and List<dynamic> from different nostr implementations
@@ -242,6 +244,9 @@ class VideoEvent {
         case 'reposts':
           // Original repost count from classic Vine
           originalReposts = int.tryParse(tagValue);
+        case 'expiration':
+          // NIP-40 expiration timestamp (Unix timestamp in seconds)
+          expirationTimestamp = int.tryParse(tagValue);
         case 't':
           if (tagValue.isNotEmpty) {
             hashtags.add(tagValue);
@@ -431,6 +436,7 @@ class VideoEvent {
       originalLikes: originalLikes,
       originalComments: originalComments,
       originalReposts: originalReposts,
+      expirationTimestamp: expirationTimestamp,
     );
   }
   final String id;
@@ -472,6 +478,15 @@ class VideoEvent {
   final int? originalLikes; // Original like count from classic Vine
   final int? originalComments; // Original comment count from classic Vine
   final int? originalReposts; // Original repost count from classic Vine
+  final int? expirationTimestamp; // NIP-40 expiration timestamp (Unix timestamp in seconds)
+
+  /// NIP-40: Check if this event has expired
+  /// Returns true if expiration timestamp is set and current time >= expiration
+  bool get isExpired {
+    if (expirationTimestamp == null) return false;
+    final nowTimestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    return nowTimestamp >= expirationTimestamp!;
+  }
 
   /// ProofMode: Get verification level from tags
   String? get proofModeVerificationLevel {

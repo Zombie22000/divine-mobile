@@ -47,7 +47,6 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
 
   // Background upload state (managed by Task 3 - initState/dispose)
   String? _backgroundUploadId;
-  UploadStatus? _uploadStatus;
   StreamSubscription? _uploadProgressListener;
 
   @override
@@ -184,22 +183,17 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
       Log.info('📝 Starting background upload for draft: ${_currentDraft!.id}',
           category: LogCategory.video);
 
-      // Start upload in background
-      final pendingUpload = await uploadManager.startUpload(
-        videoFile: _currentDraft!.videoFile,
+      // Start upload in background - single source of truth from draft
+      final pendingUpload = await uploadManager.startUploadFromDraft(
+        draft: _currentDraft!,
         nostrPubkey: pubkey,
-        title: _currentDraft!.title,
-        description: _currentDraft!.description,
-        hashtags: _currentDraft!.hashtags,
         videoDuration: _videoController?.value.duration ?? Duration.zero,
-        proofManifest: _currentDraft!.proofManifest,
       );
 
       // Store upload ID in state
       if (mounted) {
         setState(() {
           _backgroundUploadId = pendingUpload.id;
-          _uploadStatus = pendingUpload.status;
         });
       }
 
@@ -212,7 +206,9 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
   }
 
   /// Cancel background upload if still in progress (Task 3)
-  Future<void> _cancelBackgroundUpload() async {
+  /// Note: This is called from dispose(), so we can't await async operations.
+  /// The cancel operation will run in the background.
+  void _cancelBackgroundUpload() {
     if (_backgroundUploadId == null) {
       return;
     }
@@ -234,14 +230,15 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
           upload.status == UploadStatus.retrying) {
         Log.info('📝 Cancelling background upload: $_backgroundUploadId (status: ${upload.status})',
             category: LogCategory.video);
-        await uploadManager.cancelUpload(_backgroundUploadId!);
+        // Fire and forget - can't await in dispose()
+        unawaited(uploadManager.cancelUpload(_backgroundUploadId!));
       } else {
         Log.info('📝 Upload already complete, not cancelling: $_backgroundUploadId (status: ${upload.status})',
             category: LogCategory.video);
       }
 
-      // Cancel progress listener
-      await _uploadProgressListener?.cancel();
+      // Cancel progress listener (also fire and forget)
+      unawaited(_uploadProgressListener?.cancel());
       _uploadProgressListener = null;
     } catch (e) {
       Log.error('📝 Failed to cancel background upload: $e',
@@ -251,6 +248,9 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
 
   @override
   void dispose() {
+    // Cancel background upload if still in progress (Task 3)
+    _cancelBackgroundUpload();
+
     _titleController.dispose();
     _descriptionController.dispose();
     _hashtagController.dispose();
@@ -1224,9 +1224,8 @@ Video: ${_currentDraft?.videoFile.path ?? 'Unknown'}
       _publishingStatus = 'Uploading video...';
     });
 
-    final pendingUpload = await uploadManager.startUpload(
-      videoFile: _currentDraft!.videoFile,
-      nostrPubkey: pubkey,
+    // Update draft with edited metadata before upload
+    final updatedDraft = _currentDraft!.copyWith(
       title: _titleController.text.trim().isEmpty
           ? null
           : _titleController.text.trim(),
@@ -1234,8 +1233,12 @@ Video: ${_currentDraft?.videoFile.path ?? 'Unknown'}
           ? null
           : _descriptionController.text.trim(),
       hashtags: _hashtags.isEmpty ? null : _hashtags,
+    );
+
+    final pendingUpload = await uploadManager.startUploadFromDraft(
+      draft: updatedDraft,
+      nostrPubkey: pubkey,
       videoDuration: _videoController?.value.duration ?? Duration.zero,
-      proofManifest: proofManifest,
     );
 
     Log.info('📝 Upload started, ID: ${pendingUpload.id}',

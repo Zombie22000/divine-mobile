@@ -10,6 +10,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:openvine/models/pending_upload.dart';
+import 'package:openvine/models/vine_draft.dart';
 import 'package:openvine/services/circuit_breaker_service.dart';
 import 'package:openvine/services/blossom_upload_service.dart';
 import 'package:openvine/services/crash_reporting_service.dart';
@@ -237,7 +238,34 @@ class UploadManager {
   List<PendingUpload> get uploadsReadyForProcessing =>
       getUploadsByStatus(UploadStatus.processing);
 
-  /// Start a new video upload
+  /// Start upload from VineDraft (preferred method - single source of truth)
+  Future<PendingUpload> startUploadFromDraft({
+    required VineDraft draft,
+    required String nostrPubkey,
+    Duration? videoDuration,
+  }) async {
+    Log.info('🚀 === STARTING UPLOAD FROM DRAFT ===',
+        name: 'UploadManager', category: LogCategory.video);
+    Log.info('📜 Draft ID: ${draft.id}, hasProofMode: ${draft.hasProofMode}',
+        name: 'UploadManager', category: LogCategory.video);
+
+    if (draft.hasProofMode) {
+      Log.info('📜 ProofManifest JSON length: ${draft.proofManifestJson?.length ?? 0} characters',
+          name: 'UploadManager', category: LogCategory.video);
+    }
+
+    return _startUploadInternal(
+      videoFile: draft.videoFile,
+      nostrPubkey: nostrPubkey,
+      title: draft.title,
+      description: draft.description,
+      hashtags: draft.hashtags,
+      videoDuration: videoDuration,
+      proofManifestJson: draft.proofManifestJson,
+    );
+  }
+
+  /// Start a new video upload (legacy method - prefer startUploadFromDraft)
   Future<PendingUpload> startUpload({
     required File videoFile,
     required String nostrPubkey,
@@ -249,6 +277,48 @@ class UploadManager {
     int? videoHeight,
     Duration? videoDuration,
     ProofManifest? proofManifest,
+  }) async {
+    Log.warning('⚠️ Using legacy startUpload() - prefer startUploadFromDraft()',
+        name: 'UploadManager', category: LogCategory.video);
+
+    // Convert ProofManifest to JSON if present
+    String? proofManifestJson;
+    if (proofManifest != null) {
+      try {
+        proofManifestJson = jsonEncode(proofManifest.toJson());
+        Log.info('📜 ProofManifest attached to upload (${proofManifest.segments.length} segments)',
+            name: 'UploadManager', category: LogCategory.video);
+      } catch (e) {
+        Log.error('Failed to serialize ProofManifest: $e',
+            name: 'UploadManager', category: LogCategory.system);
+      }
+    }
+
+    return _startUploadInternal(
+      videoFile: videoFile,
+      nostrPubkey: nostrPubkey,
+      title: title,
+      description: description,
+      hashtags: hashtags,
+      videoWidth: videoWidth,
+      videoHeight: videoHeight,
+      videoDuration: videoDuration,
+      proofManifestJson: proofManifestJson,
+    );
+  }
+
+  /// Internal upload method - handles actual upload logic
+  Future<PendingUpload> _startUploadInternal({
+    required File videoFile,
+    required String nostrPubkey,
+    String? thumbnailPath,
+    String? title,
+    String? description,
+    List<String>? hashtags,
+    int? videoWidth,
+    int? videoHeight,
+    Duration? videoDuration,
+    String? proofManifestJson,
   }) async {
     Log.info('🚀 === STARTING UPLOAD ===',
         name: 'UploadManager', category: LogCategory.video);
@@ -310,19 +380,10 @@ class UploadManager {
     Log.info('📦 Creating PendingUpload record...',
         name: 'UploadManager', category: LogCategory.video);
 
-    // Convert ProofManifest to JSON if present
-    String? proofManifestJson;
-    if (proofManifest != null) {
-      try {
-        proofManifestJson = jsonEncode(proofManifest.toJson());
-        Log.info('📜 ProofManifest attached to upload (${proofManifest.segments.length} segments, deviceAttestation: ${proofManifest.deviceAttestation != null}, pgpSignature: ${proofManifest.pgpSignature != null})',
-            name: 'UploadManager', category: LogCategory.video);
-        Log.info('📜 ProofManifest JSON length: ${proofManifestJson.length} characters',
-            name: 'UploadManager', category: LogCategory.video);
-      } catch (e) {
-        Log.error('Failed to serialize ProofManifest: $e',
-            name: 'UploadManager', category: LogCategory.video);
-      }
+    // Log ProofMode status
+    if (proofManifestJson != null && proofManifestJson.isNotEmpty) {
+      Log.info('📜 ProofManifest attached to upload (${proofManifestJson.length} characters)',
+          name: 'UploadManager', category: LogCategory.video);
     } else {
       Log.info('📜 No ProofManifest provided to upload',
           name: 'UploadManager', category: LogCategory.video);
