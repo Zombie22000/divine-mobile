@@ -97,11 +97,17 @@ class VideoErrorOverlay extends ConsumerWidget {
                         final ageVerificationService = ref.read(ageVerificationServiceProvider);
                         final verified = await ageVerificationService.verifyAdultContentAccess(context);
 
-                        if (verified) {
-                          // Retry with auth after verification
-                          ref.invalidate(
-                            individualVideoControllerProvider(controllerParams),
-                          );
+                        if (verified && context.mounted) {
+                          // Pre-cache auth headers before retrying
+                          // This ensures the retry will have headers available immediately
+                          await _precacheAuthHeaders(ref, controllerParams);
+
+                          // Now retry with auth after verification
+                          if (context.mounted) {
+                            ref.invalidate(
+                              individualVideoControllerProvider(controllerParams),
+                            );
+                          }
                         }
                       } else {
                         // Regular retry for other errors
@@ -122,5 +128,48 @@ class VideoErrorOverlay extends ConsumerWidget {
           ),
       ],
     );
+  }
+}
+
+/// Pre-cache authentication headers for a video before retrying
+/// This ensures the retry will have headers available immediately without a second 401 failure
+Future<void> _precacheAuthHeaders(WidgetRef ref, VideoControllerParams controllerParams) async {
+  try {
+    final blossomAuthService = ref.read(blossomAuthServiceProvider);
+
+    if (!blossomAuthService.canCreateHeaders || controllerParams.videoEvent == null) {
+      return;
+    }
+
+    final videoEvent = controllerParams.videoEvent as dynamic;
+    final sha256 = videoEvent.sha256 as String?;
+
+    if (sha256 == null || sha256.isEmpty) {
+      return;
+    }
+
+    // Extract server URL from video URL
+    String? serverUrl;
+    try {
+      final uri = Uri.parse(controllerParams.videoUrl);
+      serverUrl = '${uri.scheme}://${uri.host}';
+    } catch (e) {
+      return;
+    }
+
+    // Generate auth header
+    final authHeader = await blossomAuthService.createGetAuthHeader(
+      sha256Hash: sha256,
+      serverUrl: serverUrl,
+    );
+
+    if (authHeader != null) {
+      // Cache the header for immediate use
+      final cache = {...ref.read(authHeadersCacheProvider)};
+      cache[controllerParams.videoId] = {'Authorization': authHeader};
+      ref.read(authHeadersCacheProvider.notifier).state = cache;
+    }
+  } catch (e) {
+    // Log error but don't block retry - retry will attempt without cached headers
   }
 }
