@@ -411,9 +411,11 @@ class _UniversalCameraScreenPureState extends ConsumerState<UniversalCameraScree
                     child: ClipRect(
                       child: Stack(
                         children: [
-                          // Preview widget
+                          // Preview widget scaled to fill container
                           if (recordingState.isInitialized)
-                            ref.read(vineRecordingProvider.notifier).previewWidget
+                            SizedBox.expand(
+                              child: ref.read(vineRecordingProvider.notifier).previewWidget,
+                            )
                           else
                             CameraPreviewPlaceholder(
                               isRecording: recordingState.isRecording,
