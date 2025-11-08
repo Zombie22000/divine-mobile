@@ -3,6 +3,7 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'package:openvine/models/aspect_ratio.dart';
 import 'package:openvine/services/proofmode_session_service.dart';
 import 'package:openvine/utils/unified_logger.dart';
 
@@ -28,6 +29,7 @@ class VineDraft {
     this.publishError,
     required this.publishAttempts,
     this.proofManifestJson,
+    required this.aspectRatio,
   });
 
   factory VineDraft.create({
@@ -38,6 +40,7 @@ class VineDraft {
     required int frameCount,
     required String selectedApproach,
     String? proofManifestJson,
+    AspectRatio aspectRatio = AspectRatio.square,
   }) {
     final now = DateTime.now();
     return VineDraft(
@@ -54,6 +57,7 @@ class VineDraft {
       publishError: null,
       publishAttempts: 0,
       proofManifestJson: proofManifestJson,
+      aspectRatio: aspectRatio,
     );
   }
 
@@ -73,6 +77,12 @@ class VineDraft {
         publishError: json['publishError'] as String?,
         publishAttempts: json['publishAttempts'] as int? ?? 0,
         proofManifestJson: json['proofManifestJson'] as String?,
+        aspectRatio: json['aspectRatio'] != null
+            ? AspectRatio.values.firstWhere(
+                (e) => e.name == json['aspectRatio'],
+                orElse: () => AspectRatio.square,
+              )
+            : AspectRatio.square, // Default for legacy drafts
       );
   final String id;
   final File videoFile;
@@ -87,6 +97,7 @@ class VineDraft {
   final String? publishError;
   final int publishAttempts;
   final String? proofManifestJson;
+  final AspectRatio aspectRatio;
 
   /// Check if this draft has ProofMode data
   bool get hasProofMode => proofManifestJson != null;
@@ -111,6 +122,7 @@ class VineDraft {
     Object? publishError = _sentinel,
     int? publishAttempts,
     Object? proofManifestJson = _sentinel,
+    AspectRatio? aspectRatio,
   }) =>
       VineDraft(
         id: id,
@@ -130,6 +142,7 @@ class VineDraft {
         proofManifestJson: proofManifestJson == _sentinel
             ? this.proofManifestJson
             : proofManifestJson as String?,
+        aspectRatio: aspectRatio ?? this.aspectRatio,
       );
 
   static const _sentinel = Object();
@@ -148,6 +161,7 @@ class VineDraft {
         'publishError': publishError,
         'publishAttempts': publishAttempts,
         'proofManifestJson': proofManifestJson,
+        'aspectRatio': aspectRatio.name,
       };
 
   String get displayDuration {
