@@ -68,16 +68,26 @@ class HashtagFeed extends _$HashtagFeed {
     await videoEventService.subscribeToHashtagVideos([tag], limit: 100);
 
     // Set up continuous listening for video updates
+    // Track last known count to avoid rebuilding on unrelated changes
+    int lastKnownCount = videoEventService.hashtagVideos(tag).length;
+
     void onVideosChanged() {
-      // Debounce rebuilds to avoid excessive updates
-      _rebuildDebounceTimer?.cancel();
-      _rebuildDebounceTimer = Timer(const Duration(milliseconds: 500), () {
-        if (ref.mounted) {
-          Log.info('🏷️  HashtagFeed: Videos changed, rebuilding #$tag',
-              name: 'HashtagFeedProvider', category: LogCategory.video);
-          ref.invalidateSelf();
-        }
-      });
+      // Only invalidate if THIS hashtag's videos changed
+      final currentCount = videoEventService.hashtagVideos(tag).length;
+      if (currentCount != lastKnownCount) {
+        lastKnownCount = currentCount;
+        // Debounce rebuilds to avoid excessive updates
+        _rebuildDebounceTimer?.cancel();
+        _rebuildDebounceTimer = Timer(const Duration(milliseconds: 500), () {
+          if (ref.mounted) {
+            Log.info(
+                '🏷️  HashtagFeed: Videos changed for #$tag ($currentCount videos), rebuilding',
+                name: 'HashtagFeedProvider',
+                category: LogCategory.video);
+            ref.invalidateSelf();
+          }
+        });
+      }
     }
 
     videoEventService.addListener(onVideosChanged);
