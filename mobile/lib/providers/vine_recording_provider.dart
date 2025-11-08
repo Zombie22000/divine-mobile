@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:riverpod/riverpod.dart' show Ref;
 import 'package:openvine/services/vine_recording_controller.dart'
-    show VineRecordingController, VineRecordingState, RecordingSegment, MacOSCameraInterface;
+    show VineRecordingController, VineRecordingState, RecordingSegment, MacOSCameraInterface, CameraPlatformInterface;
 import 'package:openvine/services/proofmode_session_service.dart'
     show ProofManifest, ProofModeSessionService;
 import 'package:openvine/services/proofmode_key_service.dart';
@@ -124,6 +124,9 @@ class VineRecordingNotifier extends StateNotifier<VineRecordingUIState> {
 
   /// Get the camera preview widget from the controller
   Widget get previewWidget => _controller.previewWidget;
+
+  /// Get the underlying camera interface for advanced controls
+  CameraPlatformInterface? get cameraInterface => _controller.cameraInterface;
 
   /// Update the state based on the current controller state
   void updateState() {

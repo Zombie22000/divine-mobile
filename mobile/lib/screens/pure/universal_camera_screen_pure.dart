@@ -18,6 +18,7 @@ import 'package:openvine/services/camera/native_macos_camera.dart';
 import 'package:openvine/theme/vine_theme.dart';
 import 'package:openvine/utils/unified_logger.dart';
 import 'package:openvine/widgets/macos_camera_preview.dart' show CameraPreviewPlaceholder;
+import 'package:openvine/widgets/camera_controls_overlay.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -405,11 +406,32 @@ class _UniversalCameraScreenPureState extends ConsumerState<UniversalCameraScree
                   child: AspectRatio(
                     aspectRatio: 1.0, // Square format like original Vine
                     child: ClipRect(
-                      child: recordingState.isInitialized
-                        ? ref.read(vineRecordingProvider.notifier).previewWidget
-                        : CameraPreviewPlaceholder(
-                            isRecording: recordingState.isRecording,
-                          ),
+                      child: Stack(
+                        children: [
+                          // Preview widget
+                          if (recordingState.isInitialized)
+                            ref.read(vineRecordingProvider.notifier).previewWidget
+                          else
+                            CameraPreviewPlaceholder(
+                              isRecording: recordingState.isRecording,
+                            ),
+
+                          // Zoom and gesture controls overlay
+                          if (recordingState.isInitialized)
+                            Consumer(
+                              builder: (context, ref, child) {
+                                final cameraInterface = ref.read(vineRecordingProvider.notifier).cameraInterface;
+                                if (cameraInterface != null) {
+                                  return CameraControlsOverlay(
+                                    cameraInterface: cameraInterface,
+                                    recordingState: recordingState.recordingState,
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
