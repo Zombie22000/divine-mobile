@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openvine/screens/welcome_screen.dart';
 import 'package:openvine/providers/app_providers.dart';
 import 'package:mockito/annotations.dart';
+import 'package:mockito/mockito.dart';
 import 'package:openvine/services/auth_service.dart';
 
 @GenerateMocks([AuthService])
@@ -18,6 +19,9 @@ void main() {
 
     setUp(() {
       mockAuthService = MockAuthService();
+      // Mock the authState property that welcome screen now uses
+      when(mockAuthService.authState).thenReturn(AuthState.authenticated);
+      when(mockAuthService.isAuthenticated).thenReturn(true);
     });
 
     testWidgets('diVine title uses Pacifico Google Font', (tester) async {
@@ -76,9 +80,10 @@ void main() {
       // Verify key elements are present
       expect(find.text('Welcome to diVine'), findsOneWidget);
       expect(find.text('Create and share short videos on the decentralized web'), findsOneWidget);
-      expect(find.text('Create New Identity'), findsOneWidget);
-      expect(find.text('Import Existing Identity'), findsOneWidget);
-      expect(find.text('What is Nostr?'), findsOneWidget);
+      expect(find.text('What is diVine?'), findsOneWidget);
+
+      // Note: Create/Import buttons no longer shown - app auto-creates nsec
+      // Users can only import keys later from settings
     });
   });
 }

@@ -137,7 +137,7 @@ final class VideoEventsProvider
   VideoEvents create() => VideoEvents();
 }
 
-String _$videoEventsHash() => r'26100b342b50fafea15b3dd3bd6b6842c42e172c';
+String _$videoEventsHash() => r'4a8c86f6d3936001d4da2f7adbad238833d843a3';
 
 /// Stream provider for video events from Nostr
 
@@ -252,3 +252,63 @@ final class VideoEventCountProvider extends $FunctionalProvider<int, int, int>
 }
 
 String _$videoEventCountHash() => r'a46a7c75e516aa2022464dfb9a2ce1988729e413';
+
+/// State provider for buffered video count
+
+@ProviderFor(BufferedVideoCount)
+const bufferedVideoCountProvider = BufferedVideoCountProvider._();
+
+/// State provider for buffered video count
+final class BufferedVideoCountProvider
+    extends $NotifierProvider<BufferedVideoCount, int> {
+  /// State provider for buffered video count
+  const BufferedVideoCountProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'bufferedVideoCountProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$bufferedVideoCountHash();
+
+  @$internal
+  @override
+  BufferedVideoCount create() => BufferedVideoCount();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(int value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<int>(value),
+    );
+  }
+}
+
+String _$bufferedVideoCountHash() =>
+    r'acdc25c0197ca4a6d46c82d545eb3d258912733d';
+
+/// State provider for buffered video count
+
+abstract class _$BufferedVideoCount extends $Notifier<int> {
+  int build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final created = build();
+    final ref = this.ref as $Ref<int, int>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<int, int>,
+              int,
+              Object?,
+              Object?
+            >;
+    element.handleValue(ref, created);
+  }
+}

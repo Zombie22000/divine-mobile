@@ -92,19 +92,17 @@ class AppShell extends ConsumerWidget {
         context.goHome(lastIndex ?? 0);  // Home always has an index
         break;
       case 1:
-        context.goExplore(lastIndex);  // Explore can be null (grid mode)
+        // Always reset to grid mode (null) when tapping Explore tab
+        // This prevents the "No videos available" bug when returning from another tab
+        context.goExplore(null);
         break;
       case 2:
         context.goNotifications(lastIndex ?? 0);  // Notifications always has an index
         break;
       case 3:
-        // For profile, use 'me' special identifier for current user
+        // Always navigate to current user's profile when tapping Profile tab
         // Navigation system will resolve 'me' to actual npub
-        final ctx = ref.read(pageContextProvider).asData?.value;
-        final identifier = ctx?.npub ?? 'me';
-        // Show grid mode (no video index) when tapping Profile tab
-        // User can tap a video to enter fullscreen mode
-        context.goProfileGrid(identifier);
+        context.goProfileGrid('me');
         break;
     }
   }

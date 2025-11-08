@@ -264,6 +264,33 @@ void main() {
       expect(find.textContaining('viners'),
           findsNothing); // Should not show viners count without stats
     });
+
+    testWidgets('should have RefreshIndicator with correct semantic label',
+        (tester) async {
+      const testHashtag = 'bitcoin';
+
+      final testVideos = [
+        _createTestVideoEvent('1', ['bitcoin'], 'user1'),
+      ];
+
+      when(() => mockVideoService.isLoading).thenReturn(false);
+      when(() => mockVideoService.isLoadingForSubscription(any<SubscriptionType>())).thenReturn(false);
+      when(() => mockVideoService.getEventCount(any<SubscriptionType>())).thenReturn(0);
+      when(() => mockHashtagService.getVideosByHashtags([testHashtag]))
+          .thenReturn(testVideos);
+      when(() => mockHashtagService.getHashtagStats(testHashtag))
+          .thenReturn(null);
+
+      await tester.pumpWidget(createTestWidget(testHashtag));
+
+      // Find RefreshIndicator widget
+      final refreshIndicator = find.byType(RefreshIndicator);
+      expect(refreshIndicator, findsOneWidget);
+
+      // Verify semantic label
+      final refreshWidget = tester.widget<RefreshIndicator>(refreshIndicator);
+      expect(refreshWidget.semanticsLabel, 'searching for more videos');
+    });
   });
 }
 

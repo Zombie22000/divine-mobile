@@ -30,17 +30,9 @@ class HashtagFeed extends _$HashtagFeed {
     _buildCounter++;
     final buildId = _buildCounter;
 
-    Log.info(
-      '🏷️  HashtagFeed: BUILD #$buildId START',
-      name: 'HashtagFeedProvider',
-      category: LogCategory.video,
-    );
-
     // Get hashtag from route context
     final ctx = ref.watch(pageContextProvider).asData?.value;
     if (ctx == null || ctx.type != RouteType.hashtag) {
-      Log.info('HashtagFeed: Not on hashtag route, returning empty',
-          name: 'HashtagFeedProvider', category: LogCategory.video);
       return VideoFeedState(
         videos: const [],
         hasMoreContent: false,
@@ -51,8 +43,6 @@ class HashtagFeed extends _$HashtagFeed {
     final raw = (ctx.hashtag ?? '').trim();
     final tag = raw.toLowerCase(); // normalize
     if (tag.isEmpty) {
-      Log.info('HashtagFeed: Empty hashtag, returning empty',
-          name: 'HashtagFeedProvider', category: LogCategory.video);
       return VideoFeedState(
         videos: const [],
         hasMoreContent: false,
@@ -60,7 +50,7 @@ class HashtagFeed extends _$HashtagFeed {
       );
     }
 
-    Log.info('HashtagFeed: Loading videos for #$tag',
+    Log.info('HashtagFeed: Loading #$tag (build #$buildId)',
         name: 'HashtagFeedProvider', category: LogCategory.video);
 
     // Get video event service and subscribe to hashtag
@@ -72,19 +62,25 @@ class HashtagFeed extends _$HashtagFeed {
     int lastKnownCount = videoEventService.hashtagVideos(tag).length;
 
     void onVideosChanged() {
-      // Only invalidate if THIS hashtag's videos changed
+      // Only update if THIS hashtag's videos changed
       final currentCount = videoEventService.hashtagVideos(tag).length;
       if (currentCount != lastKnownCount) {
         lastKnownCount = currentCount;
-        // Debounce rebuilds to avoid excessive updates
+        // Debounce updates to avoid excessive rebuilds
         _rebuildDebounceTimer?.cancel();
         _rebuildDebounceTimer = Timer(const Duration(milliseconds: 500), () {
           if (ref.mounted) {
-            Log.info(
-                '🏷️  HashtagFeed: Videos changed for #$tag ($currentCount videos), rebuilding',
-                name: 'HashtagFeedProvider',
-                category: LogCategory.video);
-            ref.invalidateSelf();
+            // Update state directly instead of invalidating to prevent rebuild loop
+            final videos = List<VideoEvent>.from(videoEventService.hashtagVideos(tag))
+              ..sort(VideoEvent.compareByLoopsThenTime);
+
+            state = AsyncData(VideoFeedState(
+              videos: videos,
+              hasMoreContent: videos.length >= 10,
+              isLoadingMore: false,
+              error: null,
+              lastUpdated: DateTime.now(),
+            ));
           }
         });
       }
@@ -96,15 +92,9 @@ class HashtagFeed extends _$HashtagFeed {
     ref.onDispose(() {
       videoEventService.removeListener(onVideosChanged);
       _rebuildDebounceTimer?.cancel();
-      Log.info('🏷️  HashtagFeed: Disposed listener for #$tag',
-          name: 'HashtagFeedProvider', category: LogCategory.video);
     });
 
     // Wait for initial batch of videos to arrive
-    Log.info(
-        '🏷️⏳ HashtagFeed: Waiting for videos to arrive for #$tag',
-        name: 'HashtagFeedProvider',
-        category: LogCategory.video);
 
     final completer = Completer<void>();
     int stableCount = 0;
@@ -112,19 +102,11 @@ class HashtagFeed extends _$HashtagFeed {
 
     void checkStability() {
       final currentCount = videoEventService.hashtagVideos(tag).length;
-      Log.info(
-          '🏷️📊 HashtagFeed: Stability check - count changed from $stableCount to $currentCount',
-          name: 'HashtagFeedProvider',
-          category: LogCategory.video);
       if (currentCount != stableCount) {
         stableCount = currentCount;
         stabilityTimer?.cancel();
         stabilityTimer = Timer(const Duration(milliseconds: 300), () {
           if (!completer.isCompleted) {
-            Log.info(
-                '🏷️✅ HashtagFeed: Count stabilized at $stableCount videos',
-                name: 'HashtagFeedProvider',
-                category: LogCategory.video);
             completer.complete();
           }
         });
@@ -159,14 +141,12 @@ class HashtagFeed extends _$HashtagFeed {
       );
     }
 
-    // Get videos for this hashtag
-    final videos = List<VideoEvent>.from(videoEventService.hashtagVideos(tag));
+    // Get videos for this hashtag and sort by popularity (same order as grid)
+    final videos = List<VideoEvent>.from(videoEventService.hashtagVideos(tag))
+      ..sort(VideoEvent.compareByLoopsThenTime);
 
-    Log.info(
-      '✅ HashtagFeed: BUILD #$buildId COMPLETE - ${videos.length} videos for #$tag',
-      name: 'HashtagFeedProvider',
-      category: LogCategory.video,
-    );
+    Log.info('HashtagFeed: Loaded ${videos.length} videos for #$tag',
+        name: 'HashtagFeedProvider', category: LogCategory.video);
 
     return VideoFeedState(
       videos: videos,
@@ -182,12 +162,6 @@ class HashtagFeed extends _$HashtagFeed {
     final currentState = await future;
 
     if (!ref.mounted) return;
-
-    Log.info(
-      'HashtagFeed: loadMore() called - isLoadingMore: ${currentState.isLoadingMore}',
-      name: 'HashtagFeedProvider',
-      category: LogCategory.video,
-    );
 
     if (currentState.isLoadingMore) {
       return;
@@ -211,12 +185,6 @@ class HashtagFeed extends _$HashtagFeed {
       final eventCountAfter =
           videoEventService.getEventCount(SubscriptionType.hashtag);
       final newEventsLoaded = eventCountAfter - eventCountBefore;
-
-      Log.info(
-        'HashtagFeed: Loaded $newEventsLoaded new events (total: $eventCountAfter)',
-        name: 'HashtagFeedProvider',
-        category: LogCategory.video,
-      );
 
       // Reset loading state
       final newState = await future;
@@ -250,12 +218,6 @@ class HashtagFeed extends _$HashtagFeed {
     final ctx = ref.read(pageContextProvider).asData?.value;
     final raw = (ctx?.hashtag ?? '').trim();
     final tag = raw.toLowerCase();
-
-    Log.info(
-      'HashtagFeed: Refreshing hashtag feed for #$tag',
-      name: 'HashtagFeedProvider',
-      category: LogCategory.video,
-    );
 
     if (tag.isNotEmpty) {
       // Get video event service and force a fresh subscription

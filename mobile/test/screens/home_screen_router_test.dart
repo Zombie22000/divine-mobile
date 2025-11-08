@@ -274,6 +274,41 @@ void main() {
       container.dispose();
     });
 
+    testWidgets('RefreshIndicator has correct semantic label', (tester) async {
+      final mockNotifier = FakeUserProfileNotifier(onPrefetch: (_) {});
+
+      final container = ProviderContainer(
+        overrides: [
+          ...getStandardTestOverrides(),
+          homeFeedProvider.overrideWith(() => HomeFeedMock(mockVideos)),
+          userProfileProvider.overrideWith(() => mockNotifier),
+        ],
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(
+            routerConfig: container.read(goRouterProvider),
+          ),
+        ),
+      );
+
+      // Navigate to home/0
+      container.read(goRouterProvider).go('/home/0');
+      await tester.pumpAndSettle();
+
+      // Find RefreshIndicator widget
+      final refreshIndicator = tester.widget<RefreshIndicator>(
+        find.byType(RefreshIndicator),
+      );
+
+      // Verify semantic label
+      expect(refreshIndicator.semanticsLabel, 'searching for more videos');
+
+      container.dispose();
+    });
+
     testWidgets('prefetches profiles around current index', (tester) async {
       final prefetchedPubkeys = <String>[];
 

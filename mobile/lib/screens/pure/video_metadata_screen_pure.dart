@@ -739,7 +739,7 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
             : _descriptionController.text.trim(),
         hashtags: _hashtags.isEmpty ? null : _hashtags,
         videoDuration: _videoController?.value.duration ?? Duration.zero,
-        proofManifest: null, // TODO: Add proofManifest to VineDraft model if needed
+        proofManifest: _currentDraft!.proofManifest,
       );
 
       Log.info('📝 Upload started, ID: ${pendingUpload.id}',

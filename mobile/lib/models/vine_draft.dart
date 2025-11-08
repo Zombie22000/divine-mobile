@@ -1,7 +1,10 @@
 // ABOUTME: Data model for Vine drafts that users save before publishing
 // ABOUTME: Includes video file path, metadata, publish status, and timestamps
 
+import 'dart:convert';
 import 'dart:io';
+import 'package:openvine/services/proofmode_session_service.dart';
+import 'package:openvine/utils/unified_logger.dart';
 
 enum PublishStatus {
   draft,
@@ -24,6 +27,7 @@ class VineDraft {
     required this.publishStatus,
     this.publishError,
     required this.publishAttempts,
+    this.proofManifestJson,
   });
 
   factory VineDraft.create({
@@ -33,6 +37,7 @@ class VineDraft {
     required List<String> hashtags,
     required int frameCount,
     required String selectedApproach,
+    String? proofManifestJson,
   }) {
     final now = DateTime.now();
     return VineDraft(
@@ -48,6 +53,7 @@ class VineDraft {
       publishStatus: PublishStatus.draft,
       publishError: null,
       publishAttempts: 0,
+      proofManifestJson: proofManifestJson,
     );
   }
 
@@ -66,6 +72,7 @@ class VineDraft {
             : PublishStatus.draft, // Migration: default for old drafts
         publishError: json['publishError'] as String?,
         publishAttempts: json['publishAttempts'] as int? ?? 0,
+        proofManifestJson: json['proofManifestJson'] as String?,
       );
   final String id;
   final File videoFile;
@@ -79,6 +86,22 @@ class VineDraft {
   final PublishStatus publishStatus;
   final String? publishError;
   final int publishAttempts;
+  final String? proofManifestJson;
+
+  /// Check if this draft has ProofMode data
+  bool get hasProofMode => proofManifestJson != null;
+
+  /// Get deserialized ProofManifest (null if not present or invalid JSON)
+  ProofManifest? get proofManifest {
+    if (proofManifestJson == null) return null;
+    try {
+      return ProofManifest.fromJson(jsonDecode(proofManifestJson!));
+    } catch (e) {
+      Log.error('Failed to parse ProofManifest: $e',
+          name: 'VineDraft', category: LogCategory.system);
+      return null;
+    }
+  }
 
   VineDraft copyWith({
     String? title,
@@ -87,6 +110,7 @@ class VineDraft {
     PublishStatus? publishStatus,
     Object? publishError = _sentinel,
     int? publishAttempts,
+    Object? proofManifestJson = _sentinel,
   }) =>
       VineDraft(
         id: id,
@@ -103,6 +127,9 @@ class VineDraft {
             ? this.publishError
             : publishError as String?,
         publishAttempts: publishAttempts ?? this.publishAttempts,
+        proofManifestJson: proofManifestJson == _sentinel
+            ? this.proofManifestJson
+            : proofManifestJson as String?,
       );
 
   static const _sentinel = Object();
@@ -120,6 +147,7 @@ class VineDraft {
         'publishStatus': publishStatus.name,
         'publishError': publishError,
         'publishAttempts': publishAttempts,
+        'proofManifestJson': proofManifestJson,
       };
 
   String get displayDuration {

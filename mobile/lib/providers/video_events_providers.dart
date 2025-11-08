@@ -42,6 +42,52 @@ class VideoEvents extends _$VideoEvents {
   bool _isSubscribed = false;
   bool get _canEmit => _controller != null && !(_controller!.isClosed);
 
+  // Buffer for new videos that arrive while user is browsing
+  final List<VideoEvent> _bufferedEvents = [];
+  bool _bufferingEnabled = false;
+
+  /// Enable buffering mode - new videos go to buffer instead of auto-inserting
+  void enableBuffering() {
+    _bufferingEnabled = true;
+    Log.info('VideoEvents: Buffering enabled - new videos will be buffered',
+        name: 'VideoEventsProvider', category: LogCategory.video);
+  }
+
+  /// Disable buffering mode - resume auto-inserting new videos
+  void disableBuffering() {
+    _bufferingEnabled = false;
+    Log.info('VideoEvents: Buffering disabled - new videos will auto-insert',
+        name: 'VideoEventsProvider', category: LogCategory.video);
+  }
+
+  /// Get count of buffered videos
+  int get bufferedCount => _bufferedEvents.length;
+
+  /// Load all buffered videos into main feed
+  void loadBufferedVideos() {
+    if (_bufferedEvents.isEmpty) return;
+
+    final service = ref.read(videoEventServiceProvider);
+    final currentVideos = List<VideoEvent>.from(service.discoveryVideos);
+
+    // Insert buffered videos at the beginning
+    currentVideos.insertAll(0, _bufferedEvents);
+
+    Log.info('VideoEvents: Loading ${_bufferedEvents.length} buffered videos',
+        name: 'VideoEventsProvider', category: LogCategory.video);
+
+    _bufferedEvents.clear();
+
+    // Emit updated list
+    if (_canEmit) {
+      _controller!.add(currentVideos);
+      _lastEmittedEvents = currentVideos;
+    }
+
+    // Notify listeners that buffer was cleared
+    ref.read(bufferedVideoCountProvider.notifier).state = 0;
+  }
+
   @override
   Stream<List<VideoEvent>> build() {
     // Create stream controller first
@@ -165,6 +211,7 @@ class VideoEvents extends _$VideoEvents {
     }
 
     // Always emit current events if available (no reordering - preserve insertion order)
+    // Create defensive copy to prevent service mutations from affecting emitted state
     final currentEvents = List<VideoEvent>.from(service.discoveryVideos);
 
     Log.error('  🔍 About to emit ${currentEvents.length} current events (canEmit: $_canEmit)',
@@ -179,7 +226,8 @@ class VideoEvents extends _$VideoEvents {
           name: 'VideoEventsProvider', category: LogCategory.video);
       if (_canEmit && !_listEquals(currentEvents, _lastEmittedEvents)) {
         _controller!.add(currentEvents);
-        _lastEmittedEvents = List<VideoEvent>.from(currentEvents);
+        // Store reference (not copy) to enable identical() checks downstream
+        _lastEmittedEvents = currentEvents;
         Log.error(
           '  ✅ EMITTED ${currentEvents.length} events to stream!',
           name: 'VideoEventsProvider',
@@ -209,15 +257,35 @@ class VideoEvents extends _$VideoEvents {
   /// Listener callback for service changes
   void _onVideoEventServiceChange() {
     final service = ref.read(videoEventServiceProvider);
-    final newEvents = List<VideoEvent>.from(service.discoveryVideos);
+    final newEvents = service.discoveryVideos; // Use direct reference (no copy)
 
     // Only process if the list has actually changed
     if (_listEquals(newEvents, _lastEmittedEvents)) {
       return; // No change, skip emission
     }
 
+    // If buffering is enabled, find new videos and add to buffer
+    if (_bufferingEnabled) {
+      final lastEmittedIds = _lastEmittedEvents?.map((e) => e.id).toSet() ?? {};
+      final newVideoEvents = newEvents.where((e) => !lastEmittedIds.contains(e.id)).toList();
+
+      if (newVideoEvents.isNotEmpty) {
+        _bufferedEvents.addAll(newVideoEvents);
+        Log.info(
+          '📦 VideoEvents: Buffered ${newVideoEvents.length} new videos (total buffered: ${_bufferedEvents.length})',
+          name: 'VideoEventsProvider',
+          category: LogCategory.video,
+        );
+
+        // Update buffered count provider
+        ref.read(bufferedVideoCountProvider.notifier).state = _bufferedEvents.length;
+      }
+      return; // Don't emit updates while buffering
+    }
+
     // Store pending events for debounced emission (no reordering - preserve order)
-    _pendingEvents = newEvents;
+    // Create defensive copy ONLY when contents changed
+    _pendingEvents = List<VideoEvent>.from(newEvents);
 
     // Cancel any existing timer
     _debounceTimer?.cancel();
@@ -233,7 +301,8 @@ class VideoEvents extends _$VideoEvents {
             category: LogCategory.video,
           );
           _controller!.add(_pendingEvents!);
-          _lastEmittedEvents = List<VideoEvent>.from(_pendingEvents!);
+          // Store reference (not copy) to enable identical() checks downstream
+          _lastEmittedEvents = _pendingEvents;
         }
         _pendingEvents = null;
       }
@@ -310,4 +379,11 @@ bool videoEventsLoading(Ref ref) => ref.watch(videoEventsProvider).isLoading;
 int videoEventCount(Ref ref) {
   final asyncState = ref.watch(videoEventsProvider);
   return asyncState.hasValue ? (asyncState.value?.length ?? 0) : 0;
+}
+
+/// State provider for buffered video count
+@riverpod
+class BufferedVideoCount extends _$BufferedVideoCount {
+  @override
+  int build() => 0;
 }

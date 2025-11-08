@@ -34,6 +34,8 @@ import 'package:openvine/utils/string_utils.dart';
 import 'package:openvine/helpers/follow_actions_helper.dart';
 import 'package:openvine/widgets/user_avatar.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:openvine/screens/followers_screen.dart';
+import 'package:openvine/screens/following_screen.dart';
 
 /// Router-driven ProfileScreen - Instagram-style scrollable profile
 class ProfileScreenRouter extends ConsumerStatefulWidget {
@@ -79,6 +81,24 @@ class _ProfileScreenRouterState extends ConsumerState<ProfileScreenRouter>
       // Still call fetchProfile to trigger background refresh if needed
       userProfileService.fetchProfile(userIdHex);
     }
+  }
+
+  void _navigateToFollowers(BuildContext context, String pubkey, String displayName) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FollowersScreen(pubkey: pubkey, displayName: displayName),
+      ),
+    );
+  }
+
+  void _navigateToFollowing(BuildContext context, String pubkey, String displayName) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FollowingScreen(pubkey: pubkey, displayName: displayName),
+      ),
+    );
   }
 
   @override

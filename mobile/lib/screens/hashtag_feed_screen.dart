@@ -8,6 +8,7 @@ import 'package:openvine/models/video_event.dart';
 import 'package:openvine/router/nav_extensions.dart';
 import 'package:openvine/services/video_event_service.dart';
 import 'package:openvine/theme/vine_theme.dart';
+import 'package:openvine/utils/unified_logger.dart';
 import 'package:openvine/widgets/composable_video_grid.dart';
 import 'package:openvine/widgets/video_feed_item.dart';
 
@@ -134,13 +135,27 @@ class _HashtagFeedScreenState extends ConsumerState<HashtagFeedScreen> {
                   // Default behavior: navigate to hashtag feed mode using GoRouter
                   context.goHashtag(widget.hashtag, index);
                 },
+                onRefresh: () async {
+                  Log.info('🔄 HashtagFeedScreen: Refreshing hashtag #${widget.hashtag}',
+                      category: LogCategory.video);
+                  // Resubscribe to hashtag to fetch fresh data
+                  await hashtagService.subscribeToHashtagVideos([widget.hashtag]);
+                },
               );
             }
 
             // Standalone mode: full-screen scrollable list
             final isLoadingMore = isLoadingHashtag;
 
-            return ListView.builder(
+            return RefreshIndicator(
+              semanticsLabel: 'searching for more videos',
+              onRefresh: () async {
+                Log.info('🔄 HashtagFeedScreen: Refreshing hashtag #${widget.hashtag}',
+                    category: LogCategory.video);
+                // Resubscribe to hashtag to fetch fresh data
+                await hashtagService.subscribeToHashtagVideos([widget.hashtag]);
+              },
+              child: ListView.builder(
               // Add 1 for loading indicator if still loading
               itemCount: videos.length + (isLoadingMore ? 1 : 0),
               itemBuilder: (context, index) {
@@ -193,6 +208,7 @@ class _HashtagFeedScreenState extends ConsumerState<HashtagFeedScreen> {
                   ),
                 );
               },
+            ),
             );
           },
         );

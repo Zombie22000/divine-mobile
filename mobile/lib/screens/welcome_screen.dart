@@ -1,13 +1,12 @@
-// ABOUTME: Welcome screen for new users with onboarding flow for Nostr identity setup
-// ABOUTME: Provides options to create new identity or import existing keys with TOS acceptance and age verification
+// ABOUTME: Welcome screen for new users showing TOS acceptance and age verification
+// ABOUTME: App auto-creates nsec on first launch - this screen only handles TOS and shows error if auto-creation fails
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:openvine/providers/app_providers.dart';
-import 'package:openvine/screens/key_import_screen.dart';
-import 'package:openvine/screens/profile_setup_screen.dart';
+import 'package:openvine/services/auth_service.dart';
 import 'package:openvine/theme/vine_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -28,6 +27,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   @override
   Widget build(BuildContext context) {
     final authService = ref.watch(authServiceProvider);
+    final authState = authService.authState;
     final isAuthenticated = authService.isAuthenticated;
 
     return Scaffold(
@@ -70,8 +70,15 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
 
                 const SizedBox(height: 32),
 
-                // Main action buttons
-                if (isAuthenticated)
+                // Main action buttons - show based on auth state
+                if (authState == AuthState.checking || authState == AuthState.authenticating)
+                  // Show loading indicator during auth checking or creation
+                  const Center(
+                    child: CircularProgressIndicator(
+                      color: VineTheme.vineGreen,
+                    ),
+                  )
+                else if (isAuthenticated)
                   // If already authenticated, just show Continue button
                   SizedBox(
                     width: double.infinity,
@@ -105,57 +112,52 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                             ),
                     ),
                   )
-                else ...[
-                  // If not authenticated, show identity creation/import options
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _canProceed
-                          ? () => _createNewIdentity(context, ref)
-                          : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: VineTheme.vineGreen,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.grey[800],
-                        disabledForegroundColor: Colors.grey[600],
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                else
+                  // If unauthenticated (auto-creation failed), show error
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red),
+                    ),
+                    child: Column(
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          color: Colors.red,
+                          size: 48,
                         ),
-                      ),
-                      child: const Text(
-                        'Create New Identity',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.w600),
-                      ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Setup Error',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          authService.lastError ?? 'Failed to initialize your account',
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 14,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Please restart the app. If the problem persists, contact support.',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: _canProceed
-                          ? () => _importExistingIdentity(context)
-                          : null,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        disabledForegroundColor: Colors.grey[600],
-                        side: BorderSide(
-                            color:
-                                _canProceed ? Colors.white : Colors.grey[800]!),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Import Existing Identity',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ),
-                ],
                 const SizedBox(height: 32),
 
                 // Educational content
@@ -315,46 +317,6 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
     final uri = Uri.parse(urlString);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-
-  Future<void> _createNewIdentity(BuildContext context, WidgetRef ref) async {
-    final authService = ref.read(authServiceProvider);
-
-    // Store terms acceptance
-    await _storeTermsAcceptance();
-
-    // Generate new identity
-    final result = await authService.createNewIdentity();
-
-    if (result.success && context.mounted) {
-      // Navigate to profile setup
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => const ProfileSetupScreen(isNewUser: true),
-        ),
-      );
-    } else if (context.mounted) {
-      // Show error
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.errorMessage ?? 'Failed to create identity'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Future<void> _importExistingIdentity(BuildContext context) async {
-    // Store terms acceptance
-    await _storeTermsAcceptance();
-
-    if (context.mounted) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => const KeyImportScreen(),
-        ),
-      );
     }
   }
 

@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - Comments Loading (2025-11-08)
+
+#### Bug Fixes
+- **Fixed infinite loading spinner in comments screen** - Comments now load immediately instead of waiting up to 2 minutes
+  - Root cause: CommentsProvider used blocking `await for` loop to consume Nostr event stream
+  - Nostr relays may never send EOSE (End Of Stored Events), causing 2-minute timeout waits
+  - Solution: Replaced with reactive `stream.listen()` + Completer pattern
+  - UI updates immediately as each comment event arrives
+  - Shows "Classic Vine" message immediately when no comments exist
+  - Shows empty state promptly instead of waiting for stream completion
+
+#### Technical Details
+- Modified `lib/providers/comments_provider.dart`:
+  - Replaced blocking `await for` with reactive `stream.listen()`
+  - Added `Completer<void>` to track stream completion for proper async behavior
+  - Sets `isLoading = false` after first event or when stream completes with no events
+  - Added `dart:async` import for Completer
+  - Updates UI reactively via state updates in event handler
+  - Maintains proper cleanup with `ref.onDispose()` for subscription cancellation
+
+#### Test Coverage
+- All 13 comments provider tests pass
+- No new analyzer issues introduced
+- Verified all other Nostr stream consumers already use correct reactive patterns
+
+### Added - Video Buffering & UX Improvements (2025-11-08)
+
+#### Features
+- **Added video buffering to prevent jarring auto-updates** - New videos buffer while browsing
+  - New videos arriving via Nostr subscriptions are buffered instead of auto-inserting
+  - Shows banner with count of buffered videos
+  - User can tap banner to load buffered videos at top of feed
+  - Buffering enabled when browsing Explore tabs, disabled when hidden
+  - Prevents feed jumping while user is watching videos
+
+- **Added pull-to-refresh on Explore tabs** - Refresh Popular Now, Trending, and Editor's Pick
+  - Pull down gesture refreshes current tab
+  - Shows loading indicator during refresh
+  - Invalidates and reloads appropriate provider (videoEventsProvider or curationProvider)
+
+- **Renamed "Trending" to "Popular Vines"** - More descriptive tab name in Explore screen
+
+- **Added followers/following screen navigation** - New routes for social graph views
+
+#### Technical Details
+- Modified `lib/providers/video_events_providers.dart`:
+  - Added buffering state management with `_bufferedEvents` list
+  - Added `enableBuffering()` / `disableBuffering()` methods
+  - Added `loadBufferedVideos()` to flush buffer into main feed
+  - Added `bufferedCount` getter for banner display
+  - Created `bufferedVideoCountProvider` for reactive count updates
+
+- Modified `lib/screens/explore_screen.dart`:
+  - Added `_buildNewVideosBanner()` widget for buffered videos indicator
+  - Added `onRefresh` callback to ComposableVideoGrid
+  - Integrated buffering enable/disable in screen lifecycle (onScreenVisible/onScreenHidden)
+  - Changed tab text from "Trending" to "Popular Vines"
+
+- Modified `lib/router/app_router.dart`:
+  - Split navigator keys for search modes (empty, grid, feed)
+  - Split navigator keys for hashtag modes (grid, feed)
+  - Added routes for followers/following screens
+  - Improved navigation stack isolation
+
+- Modified `lib/widgets/composable_video_grid.dart`:
+  - Added optional `onRefresh` callback parameter
+  - Integrated RefreshIndicator when callback provided
+
 ### Added - Mutual Mute Blocking (2025-11-08)
 
 #### Features

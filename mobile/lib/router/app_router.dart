@@ -14,6 +14,8 @@ import 'package:openvine/screens/notifications_screen.dart';
 import 'package:openvine/screens/profile_screen_router.dart';
 import 'package:openvine/screens/pure/search_screen_pure.dart';
 import 'package:openvine/screens/pure/universal_camera_screen_pure.dart';
+import 'package:openvine/screens/followers_screen.dart';
+import 'package:openvine/screens/following_screen.dart';
 import 'package:openvine/screens/settings_screen.dart';
 import 'package:openvine/screens/video_detail_screen.dart';
 import 'package:openvine/screens/video_editor_screen.dart';
@@ -27,8 +29,11 @@ final _homeKey = GlobalKey<NavigatorState>(debugLabel: 'home');
 final _exploreGridKey = GlobalKey<NavigatorState>(debugLabel: 'explore-grid');
 final _exploreFeedKey = GlobalKey<NavigatorState>(debugLabel: 'explore-feed');
 final _notificationsKey = GlobalKey<NavigatorState>(debugLabel: 'notifications');
-final _searchKey = GlobalKey<NavigatorState>(debugLabel: 'search');
-final _hashtagKey = GlobalKey<NavigatorState>(debugLabel: 'hashtag');
+final _searchEmptyKey = GlobalKey<NavigatorState>(debugLabel: 'search-empty');
+final _searchGridKey = GlobalKey<NavigatorState>(debugLabel: 'search-grid');
+final _searchFeedKey = GlobalKey<NavigatorState>(debugLabel: 'search-feed');
+final _hashtagGridKey = GlobalKey<NavigatorState>(debugLabel: 'hashtag-grid');
+final _hashtagFeedKey = GlobalKey<NavigatorState>(debugLabel: 'hashtag-feed');
 
 /// Maps URL location to bottom nav tab index
 /// Returns -1 for non-tab routes (like search) to hide bottom nav
@@ -203,7 +208,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             pageBuilder: (ctx, st) => NoTransitionPage(
               key: st.pageKey,
               child: Navigator(
-                key: _searchKey,
+                key: _searchEmptyKey,
                 onGenerateRoute: (r) => MaterialPageRoute(
                   builder: (_) => const SearchScreenPure(embedded: true),
                   settings: const RouteSettings(name: 'search-root'),
@@ -218,7 +223,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             pageBuilder: (ctx, st) => NoTransitionPage(
               key: st.pageKey,
               child: Navigator(
-                key: _searchKey,
+                key: _searchGridKey,
                 onGenerateRoute: (r) => MaterialPageRoute(
                   builder: (_) => const SearchScreenPure(embedded: true),
                   settings: const RouteSettings(name: 'search-root'),
@@ -233,7 +238,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             pageBuilder: (ctx, st) => NoTransitionPage(
               key: st.pageKey,
               child: Navigator(
-                key: _searchKey,
+                key: _searchFeedKey,
                 onGenerateRoute: (r) => MaterialPageRoute(
                   builder: (_) => const SearchScreenPure(embedded: true),
                   settings: const RouteSettings(name: 'search-root'),
@@ -249,7 +254,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             pageBuilder: (ctx, st) => NoTransitionPage(
               key: st.pageKey,
               child: Navigator(
-                key: _hashtagKey,
+                key: _hashtagGridKey,
                 onGenerateRoute: (r) => MaterialPageRoute(
                   builder: (_) => const HashtagScreenRouter(),
                   settings: const RouteSettings(name: 'hashtag-root'),
@@ -264,7 +269,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             pageBuilder: (ctx, st) => NoTransitionPage(
               key: st.pageKey,
               child: Navigator(
-                key: _hashtagKey,
+                key: _hashtagFeedKey,
                 onGenerateRoute: (r) => MaterialPageRoute(
                   builder: (_) => const HashtagScreenRouter(),
                   settings: const RouteSettings(name: 'hashtag-root'),
@@ -287,6 +292,40 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings',
         builder: (_, __) => const SettingsScreen(),
+      ),
+      // Followers screen
+      GoRoute(
+        path: '/followers/:pubkey',
+        builder: (ctx, st) {
+          final pubkey = st.pathParameters['pubkey'];
+          final displayName = st.extra as String? ?? 'User';
+          if (pubkey == null || pubkey.isEmpty) {
+            return Scaffold(
+              appBar: AppBar(title: const Text('Error')),
+              body: const Center(
+                child: Text('Invalid user ID'),
+              ),
+            );
+          }
+          return FollowersScreen(pubkey: pubkey, displayName: displayName);
+        },
+      ),
+      // Following screen
+      GoRoute(
+        path: '/following/:pubkey',
+        builder: (ctx, st) {
+          final pubkey = st.pathParameters['pubkey'];
+          final displayName = st.extra as String? ?? 'User';
+          if (pubkey == null || pubkey.isEmpty) {
+            return Scaffold(
+              appBar: AppBar(title: const Text('Error')),
+              body: const Center(
+                child: Text('Invalid user ID'),
+              ),
+            );
+          }
+          return FollowingScreen(pubkey: pubkey, displayName: displayName);
+        },
       ),
       // Video detail route (for deep links)
       GoRoute(

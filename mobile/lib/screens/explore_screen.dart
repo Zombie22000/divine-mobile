@@ -228,7 +228,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
             },
             tabs: const [
               Tab(text: 'New Vines'),
-              Tab(text: 'Trending'),
+              Tab(text: 'Popular Vines'),
               Tab(text: "Editor's Pick"),
             ],
           ),
@@ -258,13 +258,19 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
           return _buildHashtagModeContent(_hashtagMode!);
         }
 
-        // Default: show tab view
-        return TabBarView(
-          controller: _tabController,
+        // Default: show tab view with banner
+        return Stack(
           children: [
-            _buildPopularNowTab(),
-            _buildTrendingTab(),
-            _buildEditorsPickTab(),
+            TabBarView(
+              controller: _tabController,
+              children: [
+                _buildPopularNowTab(),
+                _buildTrendingTab(),
+                _buildEditorsPickTab(),
+              ],
+            ),
+            // New videos banner (only show on New Vines and Trending tabs)
+            if (_tabController.index < 2) _buildNewVideosBanner(),
           ],
         );
       },
@@ -704,6 +710,19 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
             category: LogCategory.video);
         _enterFeedMode(videos, index);
       },
+      onRefresh: () async {
+        Log.info('🔄 ExploreScreen: Refreshing $tabName tab',
+            category: LogCategory.video);
+
+        // Refresh the appropriate provider based on tab
+        if (tabName == "Editor's Pick") {
+          await ref.read(curationProvider.notifier).refreshAll();
+        } else {
+          // For Popular Now and Trending tabs, refresh video events
+          ref.invalidate(videoEventsProvider);
+          await ref.read(videoEventsProvider.future);
+        }
+      },
       emptyBuilder: () => Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -736,11 +755,17 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
   void onScreenVisible() {
     // Handle screen becoming visible
     Log.debug('🎯 ExploreScreen became visible', category: LogCategory.video);
+
+    // Enable buffering to prevent jarring auto-updates while browsing
+    ref.read(videoEventsProvider.notifier).enableBuffering();
   }
 
   void onScreenHidden() {
     // Handle screen becoming hidden
     Log.debug('🎯 ExploreScreen became hidden', category: LogCategory.video);
+
+    // Disable buffering when hidden (so videos load normally when returning)
+    ref.read(videoEventsProvider.notifier).disableBuffering();
   }
 
   bool get isInFeedMode {
@@ -772,5 +797,59 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
   void playSpecificVideo(VideoEvent video, List<VideoEvent> videos, int index) {
     Log.debug('🎯 ExploreScreen playing specific video: ${video.id}', category: LogCategory.video);
     _enterFeedMode(videos, index);
+  }
+
+  /// Build banner that shows when new videos are buffered
+  Widget _buildNewVideosBanner() {
+    final bufferedCount = ref.watch(bufferedVideoCountProvider);
+
+    if (bufferedCount == 0) {
+      return const SizedBox.shrink();
+    }
+
+    return Positioned(
+      top: 16,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: GestureDetector(
+          onTap: () {
+            // Load buffered videos
+            ref.read(videoEventsProvider.notifier).loadBufferedVideos();
+            Log.info('🔄 ExploreScreen: Loaded $bufferedCount buffered videos',
+                category: LogCategory.video);
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: VineTheme.vineGreen,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.arrow_upward, color: VineTheme.backgroundColor, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  '$bufferedCount new ${bufferedCount == 1 ? 'video' : 'videos'}',
+                  style: TextStyle(
+                    color: VineTheme.backgroundColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

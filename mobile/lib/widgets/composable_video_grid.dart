@@ -23,6 +23,7 @@ class ComposableVideoGrid extends ConsumerWidget {
     this.childAspectRatio = 0.72,
     this.padding,
     this.emptyBuilder,
+    this.onRefresh,
   });
 
   final List<VideoEvent> videos;
@@ -31,6 +32,7 @@ class ComposableVideoGrid extends ConsumerWidget {
   final double childAspectRatio;
   final EdgeInsets? padding;
   final Widget Function()? emptyBuilder;
+  final Future<void> Function()? onRefresh;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -65,7 +67,7 @@ class ComposableVideoGrid extends ConsumerWidget {
       return emptyBuilder!();
     }
 
-    return GridView.builder(
+    final gridView = GridView.builder(
       padding: padding ?? const EdgeInsets.all(12),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
@@ -79,6 +81,17 @@ class ComposableVideoGrid extends ConsumerWidget {
         return _buildVideoTile(context, ref, video, index, videosToShow);
       },
     );
+
+    // Wrap with RefreshIndicator if onRefresh is provided
+    if (onRefresh != null) {
+      return RefreshIndicator(
+        semanticsLabel: 'searching for more videos',
+        onRefresh: onRefresh!,
+        child: gridView,
+      );
+    }
+
+    return gridView;
   }
 
   Widget _buildVideoTile(

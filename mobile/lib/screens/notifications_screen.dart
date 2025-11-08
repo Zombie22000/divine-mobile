@@ -126,6 +126,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
               return Container(
                 color: Colors.black,
                 child: RefreshIndicator(
+                  semanticsLabel: 'checking for new notifications',
                   onRefresh: () async {
                     // TODO: Implement refresh logic
                     await Future.delayed(const Duration(seconds: 1));

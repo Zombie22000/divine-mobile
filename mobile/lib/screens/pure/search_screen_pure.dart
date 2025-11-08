@@ -13,6 +13,7 @@ import 'package:openvine/router/route_utils.dart';
 import 'package:openvine/screens/pure/explore_video_screen_pure.dart';
 import 'package:openvine/theme/vine_theme.dart';
 import 'package:openvine/widgets/composable_video_grid.dart';
+import 'package:openvine/widgets/user_profile_tile.dart';
 import 'package:openvine/utils/unified_logger.dart';
 
 /// Pure search screen using revolutionary single-controller Riverpod architecture
@@ -101,10 +102,8 @@ class _SearchScreenPureState extends ConsumerState<SearchScreenPure>
         _isSearching = false;
         _currentQuery = '';
       });
-      // Update URL to /search (no search term)
-      if (mounted && updateUrl) {
-        context.goSearch(null, null);
-      }
+      // Don't update URL while user is typing - only on explicit navigation
+      // (This prevents widget rebuilds that break the search flow)
       return;
     }
 
@@ -113,11 +112,10 @@ class _SearchScreenPureState extends ConsumerState<SearchScreenPure>
       _currentQuery = query;
     });
 
-    // Update URL to /search/term (grid mode with search term)
-    // Skip URL update during initialization to avoid infinite loops
-    if (mounted && updateUrl) {
-      context.goSearch(query, null);
-    }
+    // Don't update URL during text input - only update URL when:
+    // 1. User navigates to a specific result (handled by tap handlers)
+    // 2. Widget initializes from URL (updateUrl=false in initState)
+    // This prevents route navigation from destroying/recreating the widget on every keystroke
 
     Log.info('🔍 SearchScreenPure: Hybrid search for: $query', category: LogCategory.video);
 
@@ -260,7 +258,19 @@ class _SearchScreenPureState extends ConsumerState<SearchScreenPure>
         hintText: 'Search videos, users, hashtags...',
         hintStyle: TextStyle(color: VineTheme.whiteText.withValues(alpha: 0.6)),
         border: InputBorder.none,
-        prefixIcon: const Icon(Icons.search, color: VineTheme.whiteText),
+        prefixIcon: _isSearching
+          ? const Padding(
+              padding: EdgeInsets.all(12.0),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: VineTheme.vineGreen,
+                  strokeWidth: 2,
+                ),
+              ),
+            )
+          : const Icon(Icons.search, color: VineTheme.whiteText),
         suffixIcon: _searchController.text.isNotEmpty
           ? IconButton(
               icon: const Icon(Icons.clear, color: VineTheme.whiteText),
@@ -269,16 +279,7 @@ class _SearchScreenPureState extends ConsumerState<SearchScreenPure>
                 _performSearch('');
               },
             )
-          : _isSearching
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  color: VineTheme.whiteText,
-                  strokeWidth: 2,
-                ),
-              )
-            : null,
+          : null,
       ),
     );
 
@@ -307,19 +308,22 @@ class _SearchScreenPureState extends ConsumerState<SearchScreenPure>
 
     // Embedded mode: return content without scaffold
     if (widget.embedded) {
-      return Column(
-        children: [
-          Container(
-            color: VineTheme.cardBackground,
-            padding: const EdgeInsets.all(8),
-            child: searchBar,
-          ),
-          Container(
-            color: VineTheme.cardBackground,
-            child: tabBar,
-          ),
-          Expanded(child: tabContent),
-        ],
+      return Container(
+        color: VineTheme.backgroundColor, // Ensure visible background
+        child: Column(
+          children: [
+            Container(
+              color: VineTheme.cardBackground,
+              padding: const EdgeInsets.all(8),
+              child: searchBar,
+            ),
+            Container(
+              color: VineTheme.cardBackground,
+              child: tabBar,
+            ),
+            Expanded(child: tabContent),
+          ],
+        ),
       );
     }
 
@@ -437,38 +441,40 @@ class _SearchScreenPureState extends ConsumerState<SearchScreenPure>
       );
     }
 
+    // Sort users: those with display names first, unnamed users last
+    final sortedUsers = List<String>.from(_userResults);
+    final profileService = ref.watch(userProfileServiceProvider);
+
+    sortedUsers.sort((a, b) {
+      final profileA = profileService.getCachedProfile(a);
+      final profileB = profileService.getCachedProfile(b);
+
+      final hasNameA = profileA?.bestDisplayName != null &&
+                      !profileA!.bestDisplayName.startsWith('npub') &&
+                      !profileA.bestDisplayName.startsWith('@');
+      final hasNameB = profileB?.bestDisplayName != null &&
+                      !profileB!.bestDisplayName.startsWith('npub') &&
+                      !profileB.bestDisplayName.startsWith('@');
+
+      // Users with names come first
+      if (hasNameA && !hasNameB) return -1;
+      if (!hasNameA && hasNameB) return 1;
+      return 0;
+    });
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: _userResults.length,
+      itemCount: sortedUsers.length,
       itemBuilder: (context, index) {
-        final userPubkey = _userResults[index];
-        final profileService = ref.watch(userProfileServiceProvider);
-        final profile = profileService.getCachedProfile(userPubkey);
-        final displayName = profile?.bestDisplayName ?? '@${userPubkey}...';
+        final userPubkey = sortedUsers[index];
 
-        return Card(
-          color: VineTheme.cardBackground,
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: VineTheme.vineGreen,
-              child: Text(
-                displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
-                style: const TextStyle(color: VineTheme.whiteText, fontWeight: FontWeight.bold),
-              ),
-            ),
-            title: Text(
-              displayName,
-              style: TextStyle(color: VineTheme.primaryText),
-            ),
-            subtitle: Text(
-              'Content creator',
-              style: TextStyle(color: VineTheme.secondaryText),
-            ),
-            onTap: () {
-              Log.info('🔍 SearchScreenPure: Tapped user: $userPubkey', category: LogCategory.video);
-              context.goProfile(userPubkey, 0);
-            },
-          ),
+        return UserProfileTile(
+          pubkey: userPubkey,
+          showFollowButton: false, // Hide follow button in search results
+          onTap: () {
+            Log.info('🔍 SearchScreenPure: Tapped user: $userPubkey', category: LogCategory.video);
+            context.goProfileGrid(userPubkey);
+          },
         );
       },
     );

@@ -207,6 +207,7 @@ class _HomeScreenRouterState extends ConsumerState<HomeScreenRouter>
             }
 
             return RefreshIndicator(
+              semanticsLabel: 'searching for more videos',
               onRefresh: () => ref.read(homeRefreshControllerProvider).refresh(),
               child: PageView.builder(
                 key: const Key('home-video-page-view'),
