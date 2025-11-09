@@ -1585,8 +1585,43 @@ class VineRecordingController {
     }
   }
 
-  /// Finish recording and return the final compiled video with optional NativeProofData
-  Future<(File?, NativeProofData?)> finishRecording() async {
+  /// Generate complete ProofManifest by combining native proof and session data
+  Future<ProofManifest?> _generateProofManifest(File videoFile) async {
+    try {
+      // First generate native proof to get the video hash
+      final nativeProof = await _generateNativeProof(videoFile);
+      if (nativeProof == null) {
+        Log.info('🔐 No native proof generated, checking for ProofMode session',
+            name: 'VineRecordingController', category: LogCategory.system);
+      }
+
+      // If we have an active ProofMode session, finalize it
+      if (_proofModeSession != null && _currentProofSessionId != null) {
+        final videoHash = nativeProof?.videoHash ?? 'unknown';
+        Log.info('🔐 Finalizing ProofMode session with video hash: $videoHash',
+            name: 'VineRecordingController', category: LogCategory.system);
+
+        final manifest = await _proofModeSession!.finalizeSession(videoHash);
+        if (manifest != null) {
+          Log.info('🔐 ProofManifest generated successfully',
+              name: 'VineRecordingController', category: LogCategory.system);
+          _currentProofSessionId = null; // Clear session ID after finalization
+          return manifest;
+        }
+      }
+
+      Log.info('🔐 No ProofMode session available',
+          name: 'VineRecordingController', category: LogCategory.system);
+      return null;
+    } catch (e) {
+      Log.error('🔐 Failed to generate ProofManifest: $e',
+          name: 'VineRecordingController', category: LogCategory.system);
+      return null;
+    }
+  }
+
+  /// Finish recording and return the final compiled video with optional ProofManifest
+  Future<(File?, ProofManifest?)> finishRecording() async {
     try {
       _setState(VineRecordingState.processing);
 
@@ -1615,10 +1650,10 @@ class VineRecordingController {
           _setState(VineRecordingState.completed);
           macOSInterface.isSingleRecordingMode = false; // Clear flag after successful completion
 
-          // Generate native ProofMode proof
-          final proofData = await _generateNativeProof(croppedFile);
+          // Generate ProofManifest
+          final proofManifest = await _generateProofManifest(croppedFile);
 
-          return (croppedFile, proofData);
+          return (croppedFile, proofManifest);
         }
       }
 
@@ -1676,10 +1711,10 @@ class VineRecordingController {
 
               _setState(VineRecordingState.completed);
 
-              // Generate native ProofMode proof
-              final proofData = await _generateNativeProof(tempFile);
+              // Generate ProofManifest
+              final proofManifest = await _generateProofManifest(tempFile);
 
-              return (tempFile, proofData);
+              return (tempFile, proofManifest);
             }
           } catch (e) {
             Log.error('Failed to convert blob to file: $e',
@@ -1696,10 +1731,10 @@ class VineRecordingController {
         if (await file.exists()) {
           _setState(VineRecordingState.completed);
 
-          // Generate native ProofMode proof
-          final proofData = await _generateNativeProof(file);
+          // Generate ProofManifest
+          final proofManifest = await _generateProofManifest(file);
 
-          return (file, proofData);
+          return (file, proofManifest);
         }
       }
 
@@ -1712,10 +1747,10 @@ class VineRecordingController {
         if (concatenatedFile != null) {
           _setState(VineRecordingState.completed);
 
-          // Generate native ProofMode proof
-          final proofData = await _generateNativeProof(concatenatedFile);
+          // Generate ProofManifest
+          final proofManifest = await _generateProofManifest(concatenatedFile);
 
-          return (concatenatedFile, proofData);
+          return (concatenatedFile, proofManifest);
         }
       }
 

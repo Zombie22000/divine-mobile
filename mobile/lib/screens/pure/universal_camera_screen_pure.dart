@@ -11,11 +11,13 @@ import 'package:openvine/models/aspect_ratio.dart' as vine;
 import 'package:openvine/models/vine_draft.dart';
 import 'package:openvine/models/native_proof_data.dart';
 import 'package:openvine/providers/vine_recording_provider.dart';
+import 'package:openvine/services/proofmode_session_service.dart' show ProofManifest;
 import 'package:openvine/screens/vine_drafts_screen.dart';
 import 'package:openvine/services/draft_storage_service.dart';
 import 'package:openvine/utils/video_controller_cleanup.dart';
 import 'package:openvine/screens/pure/video_metadata_screen_pure.dart';
 import 'package:openvine/services/camera/native_macos_camera.dart';
+import 'package:openvine/services/native_proofmode_service.dart';
 import 'package:openvine/theme/vine_theme.dart';
 import 'package:openvine/utils/unified_logger.dart';
 import 'package:openvine/widgets/macos_camera_preview.dart'
@@ -39,6 +41,7 @@ class _UniversalCameraScreenPureState
   String? _errorMessage;
   bool _isProcessing = false;
   bool _permissionDenied = false;
+  bool? _proofModeAvailable; // null = checking, true = available, false = unavailable
 
   // Camera control states
   FlashMode _flashMode = FlashMode.off;
@@ -187,6 +190,9 @@ class _UniversalCameraScreenPureState
   /// Perform async initialization after the first frame
   Future<void> _performAsyncInitialization() async {
     try {
+      // Check ProofMode availability
+      _checkProofModeAvailability();
+
       // Clean up any old temp files and reset state from previous recordings
       ref.read(vineRecordingProvider.notifier).cleanupAndReset();
 
@@ -454,6 +460,42 @@ class _UniversalCameraScreenPureState
               );
             },
           ),
+          // ProofMode status indicator
+          if (_proofModeAvailable != null)
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 6,
+              ),
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(
+                color: _proofModeAvailable!
+                    ? VineTheme.vineGreen.withValues(alpha: 0.3)
+                    : Colors.orange.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _proofModeAvailable!
+                        ? Icons.verified_user
+                        : Icons.warning_amber_rounded,
+                    color: _proofModeAvailable! ? VineTheme.vineGreen : Colors.orange,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _proofModeAvailable! ? 'ProofMode' : 'No ProofMode',
+                    style: TextStyle(
+                      color: _proofModeAvailable! ? VineTheme.vineGreen : Colors.orange,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
       body: Consumer(
@@ -801,27 +843,30 @@ class _UniversalCameraScreenPureState
           ),
         ),
 
-        // Platform-specific instruction hint
-        if (!recordingState.isRecording && !recordingState.hasSegments)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Text(
-              kIsWeb
-                  ? 'Tap to record' // Web: single-shot
-                  : 'Hold to record', // Mobile: press-and-hold segments
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.8),
-                fontSize: 14,
-              ),
+        // Platform-specific instruction hint (reserve space to prevent layout shift)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            (!recordingState.isRecording && !recordingState.hasSegments)
+                ? (kIsWeb
+                    ? 'Tap to record' // Web: single-shot
+                    : 'Hold to record') // Mobile: press-and-hold segments
+                : '', // Empty but reserves space
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.8),
+              fontSize: 14,
             ),
           ),
+        ),
 
-        // Show segment count on mobile
-        if (!kIsWeb && recordingState.hasSegments)
+        // Show segment count on mobile (reserve space to prevent layout shift)
+        if (!kIsWeb)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Text(
-              '${recordingState.segments.length} ${recordingState.segments.length == 1 ? "segment" : "segments"}',
+              recordingState.hasSegments
+                  ? '${recordingState.segments.length} ${recordingState.segments.length == 1 ? "segment" : "segments"}'
+                  : '', // Empty but reserves space
               style: TextStyle(
                 color: VineTheme.vineGreen.withValues(alpha: 0.9),
                 fontSize: 14,
@@ -1025,14 +1070,7 @@ class _UniversalCameraScreenPureState
         category: LogCategory.video,
       );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Recording failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      _showErrorSnackBar('Recording failed: $e');
     }
   }
 
@@ -1068,14 +1106,7 @@ class _UniversalCameraScreenPureState
         category: LogCategory.video,
       );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Stop recording failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      _showErrorSnackBar('Stop recording failed: $e');
     }
   }
 
@@ -1087,14 +1118,14 @@ class _UniversalCameraScreenPureState
         category: LogCategory.video,
       );
 
-      final (videoFile, nativeProof) = await notifier.finishRecording();
+      final (videoFile, proofManifest) = await notifier.finishRecording();
       Log.info(
-        '📹 Recording finished, video: ${videoFile?.path}, proof: ${nativeProof != null}',
+        '📹 Recording finished, video: ${videoFile?.path}, proof: ${proofManifest != null}',
         category: LogCategory.video,
       );
 
       if (videoFile != null && mounted) {
-        _processRecording(videoFile, nativeProof);
+        _processRecording(videoFile, proofManifest);
       } else {
         Log.warning(
           '📹 No file returned from finishRecording',
@@ -1107,14 +1138,7 @@ class _UniversalCameraScreenPureState
         category: LogCategory.video,
       );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Finish recording failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      _showErrorSnackBar('Finish recording failed: $e');
     }
   }
 
@@ -1162,23 +1186,7 @@ class _UniversalCameraScreenPureState
         category: LogCategory.video,
       );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Maximum recording time reached. Press ✓ to publish.',
-            ),
-            backgroundColor: VineTheme.vineGreen,
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.only(
-              top: 100, // Position at top to avoid covering bottom controls
-              left: 16,
-              right: 16,
-            ),
-          ),
-        );
-      }
+      _showSuccessSnackBar('Maximum recording time reached. Press ✓ to publish.');
     } catch (e) {
       Log.error(
         '📹 Failed to handle auto-stop: $e',
@@ -1190,13 +1198,7 @@ class _UniversalCameraScreenPureState
   void _handleRecordingFailure() {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Camera recording failed. Please try again.'),
-        backgroundColor: Colors.red,
-        duration: Duration(seconds: 4),
-      ),
-    );
+    _showErrorSnackBar('Camera recording failed. Please try again.');
   }
 
   void _toggleTimer() {
@@ -1221,7 +1223,7 @@ class _UniversalCameraScreenPureState
 
   void _processRecording(
     File recordedFile,
-    NativeProofData? nativeProof,
+    ProofManifest? proofManifest,
   ) async {
     // Guard against double-processing
     if (_isProcessing) {
@@ -1246,18 +1248,18 @@ class _UniversalCameraScreenPureState
       final prefs = await SharedPreferences.getInstance();
       final draftService = DraftStorageService(prefs);
 
-      // Serialize NativeProofData to JSON if available
+      // Serialize ProofManifest to JSON if available
       String? proofManifestJson;
-      if (nativeProof != null) {
+      if (proofManifest != null) {
         try {
-          proofManifestJson = jsonEncode(nativeProof.toJson());
+          proofManifestJson = jsonEncode(proofManifest.toJson());
           Log.info(
-            '📜 NativeProofData attached to draft from universal camera',
+            '📜 ProofManifest attached to draft from universal camera',
             category: LogCategory.video,
           );
         } catch (e) {
           Log.error(
-            'Failed to serialize NativeProofData for draft: $e',
+            'Failed to serialize ProofManifest for draft: $e',
             category: LogCategory.video,
           );
         }
@@ -1327,12 +1329,7 @@ class _UniversalCameraScreenPureState
           _isProcessing = false;
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Processing failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showErrorSnackBar('Processing failed: $e');
       }
     }
   }
@@ -1470,6 +1467,70 @@ class _UniversalCameraScreenPureState
     String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
     String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
     return '$twoDigitMinutes:$twoDigitSeconds';
+  }
+
+  /// Check if native ProofMode is available on this platform
+  void _checkProofModeAvailability() async {
+    try {
+      final isAvailable = await NativeProofModeService.isAvailable();
+      if (mounted) {
+        setState(() {
+          _proofModeAvailable = isAvailable;
+        });
+        Log.info(
+          '🔐 ProofMode availability: $isAvailable',
+          category: LogCategory.system,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _proofModeAvailable = false;
+        });
+        Log.error(
+          '🔐 Failed to check ProofMode availability: $e',
+          category: LogCategory.system,
+        );
+      }
+    }
+  }
+
+  /// Show error snackbar at top of screen to avoid blocking controls
+  void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.only(
+          bottom: MediaQuery.of(context).size.height - 150,
+          left: 10,
+          right: 10,
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  /// Show success snackbar at top of screen
+  void _showSuccessSnackBar(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: VineTheme.vineGreen,
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.only(
+          bottom: MediaQuery.of(context).size.height - 150,
+          left: 10,
+          right: 10,
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 }
 
