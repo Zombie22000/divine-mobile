@@ -94,6 +94,9 @@ class AgeVerificationDialog extends StatelessWidget {
                           horizontal: 24,
                           vertical: 12,
                         ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
                       ),
                       child: const Text('Yes'),
                     ),
