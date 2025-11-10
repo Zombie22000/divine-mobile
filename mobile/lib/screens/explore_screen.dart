@@ -9,6 +9,7 @@ import 'package:openvine/providers/video_events_providers.dart';
 import 'package:openvine/providers/tab_visibility_provider.dart';
 import 'package:openvine/providers/curation_providers.dart';
 import 'package:openvine/providers/route_feed_providers.dart';
+import 'package:openvine/providers/popular_now_feed_provider.dart';
 import 'package:openvine/router/nav_extensions.dart';
 import 'package:openvine/router/page_context_provider.dart';
 import 'package:openvine/router/route_utils.dart';
@@ -50,7 +51,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this, initialIndex: 1); // Start on Popular Now
+    _tabController = TabController(length: 3, vsync: this, initialIndex: 1); // Start on Popular Vines
     _tabController.addListener(_onTabChanged);
 
     // Track screen load
@@ -146,6 +147,8 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
       setCustomTitle(null);  // Clear custom title
 
       // Navigate back to grid mode (no videoIndex) - URL will drive UI state
+      // Note: This navigation resets to the grid view, preserving the current tab
+      // because TabController's index persists across route changes
       context.go('/explore');
 
       Log.info('🎯 ExploreScreenPure: Reset to default state',
@@ -221,9 +224,21 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
               fontWeight: FontWeight.w500,
             ),
             onTap: (index) {
-              // If tapping the currently active tab, reset to default state
+              // If tapping the currently active tab, reset to default state (exit feed/hashtag mode)
+              // But only if we're actually in feed or hashtag mode - otherwise do nothing
               if (index == _tabController.index) {
-                _resetToDefaultState();
+                final pageContext = ref.read(pageContextProvider);
+                final isInFeedMode = pageContext.whenOrNull(
+                  data: (ctx) => ctx.videoIndex != null,
+                ) ?? false;
+                final isInHashtagMode = _hashtagMode != null;
+
+                if (isInFeedMode || isInHashtagMode) {
+                  _resetToDefaultState();
+                } else {
+                  Log.debug('🎯 ExploreScreen: Already in grid mode for tab $index, ignoring tap',
+                      category: LogCategory.video);
+                }
               }
             },
             tabs: const [
@@ -264,7 +279,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
             TabBarView(
               controller: _tabController,
               children: [
-                _buildPopularNowTab(),
+                _buildNewVinesTab(),
                 _buildTrendingTab(),
                 _buildEditorsPickTab(),
               ],
@@ -358,122 +373,118 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
     return _buildVideoGrid(editorsPicks, "Editor's Pick");
   }
 
-  Widget _buildPopularNowTab() {
-    // Watch video events from our pure provider
-    final videoEventsAsync = ref.watch(videoEventsProvider);
+  Widget _buildNewVinesTab() {
+    // Watch popular now feed from dedicated provider
+    final popularNowAsync = ref.watch(popularNowFeedProvider);
 
     Log.debug(
-      '🔍 NewVinesTab: AsyncValue state - isLoading: ${videoEventsAsync.isLoading}, '
-      'hasValue: ${videoEventsAsync.hasValue}, hasError: ${videoEventsAsync.hasError}, '
-      'value length: ${videoEventsAsync.value?.length ?? 0}',
+      '🔍 NewVinesTab: AsyncValue state - isLoading: ${popularNowAsync.isLoading}, '
+      'hasValue: ${popularNowAsync.hasValue}, hasError: ${popularNowAsync.hasError}',
       name: 'ExploreScreen',
       category: LogCategory.video,
     );
 
     // Track feed loading start
-    if (videoEventsAsync.isLoading && _feedLoadStartTime == null) {
+    if (popularNowAsync.isLoading && _feedLoadStartTime == null) {
       _feedLoadStartTime = DateTime.now();
       _feedTracker.startFeedLoad('new_vines');
     }
 
-    // CRITICAL: Check hasValue FIRST before isLoading
-    // StreamProviders can have both isLoading:true and hasValue:true during rebuilds
-    if (videoEventsAsync.hasValue && videoEventsAsync.value != null) {
-      final videos = videoEventsAsync.value!;
-      Log.info('✅ NewVinesTab: Data state - ${videos.length} videos',
-          name: 'ExploreScreen', category: LogCategory.video);
+    return popularNowAsync.when(
+      data: (feedState) {
+        final videos = feedState.videos;
+        Log.info('✅ NewVinesTab: Data state - ${videos.length} videos',
+            name: 'ExploreScreen', category: LogCategory.video);
 
-      // Track feed loaded with videos
-      if (_feedLoadStartTime != null) {
-        _feedTracker.markFirstVideosReceived('new_vines', videos.length);
-        _feedTracker.markFeedDisplayed('new_vines', videos.length);
-        _screenAnalytics.markDataLoaded('explore_screen', dataMetrics: {
-          'tab': 'new_vines',
-          'video_count': videos.length,
-        });
-        _feedLoadStartTime = null;
-      }
+        // Track feed loaded with videos
+        if (_feedLoadStartTime != null) {
+          _feedTracker.markFirstVideosReceived('new_vines', videos.length);
+          _feedTracker.markFeedDisplayed('new_vines', videos.length);
+          _screenAnalytics.markDataLoaded('explore_screen', dataMetrics: {
+            'tab': 'new_vines',
+            'video_count': videos.length,
+          });
+          _feedLoadStartTime = null;
+        }
 
-      // Track empty feed
-      if (videos.isEmpty) {
-        _feedTracker.trackEmptyFeed('new_vines');
-      }
+        // Track empty feed
+        if (videos.isEmpty) {
+          _feedTracker.trackEmptyFeed('new_vines');
+        }
 
-      // Sort by created_at timestamp (newest first)
-      final sortedVideos = List<VideoEvent>.from(videos);
-      sortedVideos.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return _buildVideoGrid(sortedVideos, 'New Vines');
-    }
+        // Videos are already sorted by PopularNowFeed provider (newest first)
+        return _buildVideoGrid(videos, 'New Vines');
+      },
+      loading: () {
+        Log.info('⏳ NewVinesTab: Showing loading indicator',
+            name: 'ExploreScreen', category: LogCategory.video);
 
-    if (videoEventsAsync.hasError) {
-      Log.error('❌ NewVinesTab: Error state - ${videoEventsAsync.error}',
-          name: 'ExploreScreen', category: LogCategory.video);
+        // Track slow loading after 5 seconds
+        if (_feedLoadStartTime != null) {
+          final elapsed = DateTime.now().difference(_feedLoadStartTime!).inMilliseconds;
+          if (elapsed > 5000) {
+            _errorTracker.trackSlowOperation(
+              operation: 'new_vines_feed_load',
+              durationMs: elapsed,
+              thresholdMs: 5000,
+              location: 'explore_new_vines',
+            );
+          }
+        }
 
-      // Track error
-      final loadTime = _feedLoadStartTime != null
-          ? DateTime.now().difference(_feedLoadStartTime!).inMilliseconds
-          : null;
-      _feedTracker.trackFeedError(
-        'new_vines',
-        errorType: 'load_failed',
-        errorMessage: videoEventsAsync.error.toString(),
-      );
-      _errorTracker.trackFeedLoadError(
-        feedType: 'new_vines',
-        errorType: 'provider_error',
-        errorMessage: videoEventsAsync.error.toString(),
-        loadTimeMs: loadTime,
-      );
-      _feedLoadStartTime = null;
-
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error, size: 64, color: VineTheme.likeRed),
-            const SizedBox(height: 16),
-            Text(
-              'Failed to load videos',
-              style: TextStyle(color: VineTheme.likeRed, fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '${videoEventsAsync.error}',
-              style: TextStyle(color: VineTheme.secondaryText, fontSize: 12),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Only show loading if we truly have no data yet
-    Log.info('⏳ NewVinesTab: Showing loading indicator',
-        name: 'ExploreScreen', category: LogCategory.video);
-
-    // Track slow loading after 5 seconds
-    if (_feedLoadStartTime != null) {
-      final elapsed = DateTime.now().difference(_feedLoadStartTime!).inMilliseconds;
-      if (elapsed > 5000) {
-        _errorTracker.trackSlowOperation(
-          operation: 'new_vines_feed_load',
-          durationMs: elapsed,
-          thresholdMs: 5000,
-          location: 'explore_new_vines',
+        return Center(
+          child: CircularProgressIndicator(color: VineTheme.vineGreen),
         );
-      }
-    }
+      },
+      error: (error, stackTrace) {
+        Log.error('❌ NewVinesTab: Error state - $error',
+            name: 'ExploreScreen', category: LogCategory.video);
 
-    return Center(
-      child: CircularProgressIndicator(color: VineTheme.vineGreen),
+        // Track error
+        final loadTime = _feedLoadStartTime != null
+            ? DateTime.now().difference(_feedLoadStartTime!).inMilliseconds
+            : null;
+        _feedTracker.trackFeedError(
+          'new_vines',
+          errorType: 'load_failed',
+          errorMessage: error.toString(),
+        );
+        _errorTracker.trackFeedLoadError(
+          feedType: 'new_vines',
+          errorType: 'provider_error',
+          errorMessage: error.toString(),
+          loadTimeMs: loadTime,
+        );
+        _feedLoadStartTime = null;
+
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error, size: 64, color: VineTheme.likeRed),
+              const SizedBox(height: 16),
+              Text(
+                'Failed to load videos',
+                style: TextStyle(color: VineTheme.likeRed, fontSize: 18),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '$error',
+                style: TextStyle(color: VineTheme.secondaryText, fontSize: 12),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
   Widget _buildTrendingTab() {
-    // Sort videos by loop count (most loops first)
+    // Sort videos by loop count (most loops first) - "Popular Vines"
     final videoEventsAsync = ref.watch(videoEventsProvider);
 
     Log.debug(
-      '🔍 TrendingTab: AsyncValue state - isLoading: ${videoEventsAsync.isLoading}, '
+      '🔍 PopularVinesTab: AsyncValue state - isLoading: ${videoEventsAsync.isLoading}, '
       'hasValue: ${videoEventsAsync.hasValue}, hasError: ${videoEventsAsync.hasError}, '
       'value length: ${videoEventsAsync.value?.length ?? 0}',
       name: 'ExploreScreen',
@@ -717,8 +728,12 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
         // Refresh the appropriate provider based on tab
         if (tabName == "Editor's Pick") {
           await ref.read(curationProvider.notifier).refreshAll();
+        } else if (tabName == "New Vines") {
+          // Refresh popular now feed
+          ref.invalidate(popularNowFeedProvider);
+          await ref.read(popularNowFeedProvider.future);
         } else {
-          // For Popular Now and Trending tabs, refresh video events
+          // For Trending tab, refresh video events
           ref.invalidate(videoEventsProvider);
           await ref.read(videoEventsProvider.future);
         }
