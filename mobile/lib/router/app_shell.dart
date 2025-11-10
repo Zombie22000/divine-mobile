@@ -131,10 +131,6 @@ class AppShell extends ConsumerWidget {
       orElse: () => false,
     );
 
-    // Hide bottom nav on edit profile screens
-    final location = GoRouterState.of(context).uri.toString();
-    final hideBottomNav = location.startsWith('/edit-profile') || location.startsWith('/setup-profile');
-
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
@@ -221,9 +217,9 @@ class AppShell extends ConsumerWidget {
       ),
       drawer: const VineDrawer(),
       body: child,
-      // Bottom nav visible for all shell routes except edit profile screens
+      // Bottom nav visible for all shell routes (search, tabs, etc.)
       // For search (currentIndex=-1), no tab is highlighted
-      bottomNavigationBar: hideBottomNav ? null : BottomNavigationBar(
+      bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: currentIndex.clamp(0, 3),
         onTap: (index) => _handleTabTap(context, ref, index),

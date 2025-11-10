@@ -55,9 +55,6 @@ int tabIndexFromLocation(String loc) {
       return 3;
     case 'search':
       return -1; // Search has AppBar but no bottom nav
-    case 'edit-profile':
-    case 'setup-profile':
-      return -1; // Edit profile screens have no bottom nav
     default:
       return 0; // fallback to home
   }
@@ -118,24 +115,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           );
         },
         routes: [
-          // PROFILE EDITING routes (must be before /profile/:npub to avoid conflicts)
-          GoRoute(
-            path: '/edit-profile',
-            name: 'edit-profile',
-            pageBuilder: (ctx, st) => NoTransitionPage(
-              key: st.pageKey,
-              child: const ProfileSetupScreen(isNewUser: false),
-            ),
-          ),
-          GoRoute(
-            path: '/setup-profile',
-            name: 'setup-profile',
-            pageBuilder: (ctx, st) => NoTransitionPage(
-              key: st.pageKey,
-              child: const ProfileSetupScreen(isNewUser: true),
-            ),
-          ),
-
           // HOME tab subtree
           GoRoute(
             path: '/home/:index',
@@ -321,6 +300,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/settings',
         name: 'settings',
         builder: (_, __) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/edit-profile',
+        name: 'edit-profile',
+        builder: (_, __) => const ProfileSetupScreen(isNewUser: false),
+      ),
+      GoRoute(
+        path: '/setup-profile',
+        name: 'setup-profile',
+        builder: (_, __) => const ProfileSetupScreen(isNewUser: true),
       ),
       // Followers screen
       GoRoute(
