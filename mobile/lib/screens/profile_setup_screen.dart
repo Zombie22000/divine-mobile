@@ -116,10 +116,14 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          automaticallyImplyLeading: true, // Show back button
-          iconTheme: const IconThemeData(color: Colors.white),
+          title: const Text('Edit Profile'),
+          backgroundColor: VineTheme.vineGreen,
+          foregroundColor: VineTheme.whiteText,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(),
+            tooltip: 'Back',
+          ),
         ),
         body: GestureDetector(
           onTap: () {
@@ -129,7 +133,8 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
           child: SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(24),
-              child: Center(
+              child: Align(
+                alignment: Alignment.topCenter,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 600),
                   child: Form(
@@ -846,9 +851,29 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Profile published successfully!'),
-              backgroundColor: Colors.green,
+            SnackBar(
+              content: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: VineTheme.vineGreen,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check,
+                      color: Colors.white,
+                      size: 17,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Profile published successfully!',
+                    style: TextStyle(color: VineTheme.vineGreen),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.white,
             ),
           );
         }
