@@ -25,7 +25,6 @@ class ProofModeBadgeRow extends StatelessWidget {
   Widget build(BuildContext context) {
     // Don't render anything if no badges to show
     if (!video.shouldShowProofModeBadge &&
-        !video.shouldShowVineBadge &&
         !video.shouldShowOriginalBadge) {
       return const SizedBox.shrink();
     }
@@ -51,14 +50,8 @@ class ProofModeBadgeRow extends StatelessWidget {
       );
     }
 
-    // Add Original Vine badge if applicable (for vintage recovered vines)
-    if (video.shouldShowVineBadge) {
-      badges.add(
-        OriginalVineBadge(
-          size: size,
-        ),
-      );
-    }
+    // Original Vine badge removed per user request
+    // (for vintage recovered vines - no longer displayed)
 
     return Wrap(
       spacing: spacing,
