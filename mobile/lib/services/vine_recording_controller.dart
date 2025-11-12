@@ -74,6 +74,9 @@ class MobileCameraInterface extends CameraPlatformInterface {
   int _currentCameraIndex = 0;
   bool isRecording = false;
 
+  // Operation mutex to prevent concurrent start/stop race conditions
+  bool _operationInProgress = false;
+
   // Zoom support
   double _minZoomLevel = 1.0;
   double _maxZoomLevel = 1.0;
@@ -172,52 +175,34 @@ class MobileCameraInterface extends CameraPlatformInterface {
       throw Exception('Camera controller not initialized');
     }
 
-    // Check actual camera recording status to avoid state desync
-    final isActuallyRecording = _controller!.value.isRecordingVideo;
+    // Wait for any in-progress operation to complete
+    // This prevents race conditions from rapid tap sequences
+    while (_operationInProgress) {
+      Log.debug('Waiting for previous camera operation to complete',
+          name: 'VineRecordingController', category: LogCategory.system);
+      await Future.delayed(const Duration(milliseconds: 10));
+    }
 
-    if (isRecording && isActuallyRecording) {
+    // Already recording - ignore duplicate start request
+    if (isRecording) {
       Log.warning('Already recording, ignoring start request',
           name: 'VineRecordingController', category: LogCategory.system);
       return;
     }
 
-    // State recovery: if we think we're recording but camera says no, reset our state
-    if (isRecording && !isActuallyRecording) {
-      Log.warning('State desync detected - resetting recording state',
-          name: 'VineRecordingController', category: LogCategory.system);
-      isRecording = false;
-    }
-
-    // State recovery: if camera is recording but we think it's not, align our state
-    if (!isRecording && isActuallyRecording) {
-      Log.warning('Camera already recording - aligning state',
-          name: 'VineRecordingController', category: LogCategory.system);
-      isRecording = true;
-      return;
-    }
-
+    _operationInProgress = true;
     try {
       await _controller!.startVideoRecording();
       isRecording = true;
       Log.info('Started mobile camera recording',
           name: 'VineRecordingController', category: LogCategory.system);
     } catch (e) {
-      // Handle "Video is already recording" exception by aligning our state
-      if (e.toString().contains('Video is already recording')) {
-        Log.info('Camera is already recording - aligning our state to continue with existing recording',
-            name: 'VineRecordingController', category: LogCategory.system);
-
-        // Align our internal state with the camera's actual state
-        isRecording = true;
-
-        // This is actually a success - we're now aligned with an ongoing recording
-        return;
-      }
-
       isRecording = false;
       Log.error('Failed to start mobile camera recording: $e',
           name: 'VineRecordingController', category: LogCategory.system);
       rethrow;
+    } finally {
+      _operationInProgress = false;
     }
   }
 
@@ -227,30 +212,21 @@ class MobileCameraInterface extends CameraPlatformInterface {
       throw Exception('Camera controller not initialized');
     }
 
-    // Check actual camera recording status to avoid state desync
-    final isActuallyRecording = _controller!.value.isRecordingVideo;
+    // Wait for any in-progress operation to complete
+    while (_operationInProgress) {
+      Log.debug('Waiting for previous camera operation to complete',
+          name: 'VineRecordingController', category: LogCategory.system);
+      await Future.delayed(const Duration(milliseconds: 10));
+    }
 
-    if (!isRecording && !isActuallyRecording) {
+    // Not recording - nothing to stop
+    if (!isRecording) {
       Log.warning('Not currently recording, skipping stopVideoRecording',
           name: 'VineRecordingController', category: LogCategory.system);
       return null;
     }
 
-    // State recovery: if we think we're not recording but camera says yes, align our state
-    if (!isRecording && isActuallyRecording) {
-      Log.warning('Camera is recording but state says no - aligning state',
-          name: 'VineRecordingController', category: LogCategory.system);
-      isRecording = true;
-    }
-
-    // State recovery: if camera is not recording but we think it is, reset our state
-    if (isRecording && !isActuallyRecording) {
-      Log.warning('State desync detected - camera not recording, resetting state',
-          name: 'VineRecordingController', category: LogCategory.system);
-      isRecording = false;
-      return null;
-    }
-
+    _operationInProgress = true;
     try {
       final xFile = await _controller!.stopVideoRecording();
       isRecording = false;
@@ -263,6 +239,8 @@ class MobileCameraInterface extends CameraPlatformInterface {
           name: 'VineRecordingController', category: LogCategory.system);
       // Don't rethrow - return null to indicate no file was saved
       return null;
+    } finally {
+      _operationInProgress = false;
     }
   }
 
@@ -275,6 +253,13 @@ class MobileCameraInterface extends CameraPlatformInterface {
       Log.warning('Cannot switch camera - only ${_availableCameras.length} camera(s) available',
           name: 'VineRecordingController', category: LogCategory.system);
       return;
+    }
+
+    // Wait for any in-progress operation to complete before switching
+    while (_operationInProgress) {
+      Log.debug('Waiting for camera operation to complete before switch',
+          name: 'VineRecordingController', category: LogCategory.system);
+      await Future.delayed(const Duration(milliseconds: 10));
     }
 
     // Don't switch if controller is not properly initialized
