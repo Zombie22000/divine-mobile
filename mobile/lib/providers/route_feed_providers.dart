@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:openvine/models/video_event.dart';
 import 'package:openvine/providers/app_providers.dart';
 import 'package:openvine/providers/home_feed_provider.dart';
+import 'package:openvine/providers/search_provider.dart';
 import 'package:openvine/providers/video_events_providers.dart';
 import 'package:openvine/router/page_context_provider.dart';
 import 'package:openvine/router/route_utils.dart';
@@ -15,6 +16,11 @@ import 'package:openvine/state/video_feed_state.dart';
 /// This is set by ExploreScreen when entering feed mode and consumed by both
 /// ExploreVideoScreenPure and activeVideoIdProvider to ensure they use the same list
 final exploreTabVideosProvider = StateProvider<List<VideoEvent>?>((ref) => null);
+
+/// Temporary provider to hold the search screen's current video list
+/// This is set by SearchScreenPure when search results are available and consumed
+/// by activeVideoIdProvider to enable video playback from search results
+final searchScreenVideosProvider = StateProvider<List<VideoEvent>?>((ref) => null);
 
 /// Home feed state (follows only)
 /// Returns AsyncValue<VideoFeedState> for route-aware home screen
@@ -95,6 +101,37 @@ final videosForExploreRouteProvider =
         },
         loading: () => const AsyncValue.loading(),
         error: (e, st) => AsyncValue.error(e, st),
+      );
+    },
+    loading: () => const AsyncValue.loading(),
+    error: (e, st) => AsyncValue.error(e, st),
+  );
+});
+
+/// Search feed state (search results)
+/// Returns AsyncValue<VideoFeedState> for route-aware search screen
+/// Provides search results as a video feed when on search route
+final videosForSearchRouteProvider =
+    Provider<AsyncValue<VideoFeedState>>((ref) {
+  final contextAsync = ref.watch(pageContextProvider);
+
+  return contextAsync.when(
+    data: (ctx) {
+      if (ctx.type != RouteType.search) {
+        // Not on search route - return loading
+        return const AsyncValue.loading();
+      }
+
+      // Get search results from SearchScreenPure's state provider
+      final searchVideos = ref.watch(searchScreenVideosProvider);
+
+      // Return search results wrapped in VideoFeedState
+      return AsyncValue.data(
+        VideoFeedState(
+          videos: searchVideos ?? const [],
+          hasMoreContent: false, // Search results are finite
+          lastUpdated: DateTime.now(),
+        ),
       );
     },
     loading: () => const AsyncValue.loading(),

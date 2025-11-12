@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openvine/models/video_event.dart';
 import 'package:openvine/providers/app_providers.dart';
+import 'package:openvine/providers/route_feed_providers.dart';
 import 'package:openvine/router/nav_extensions.dart';
 import 'package:openvine/router/page_context_provider.dart';
 import 'package:openvine/router/route_utils.dart';
@@ -161,9 +162,14 @@ class _SearchScreenPureState extends ConsumerState<SearchScreenPure>
           _localResultCount = filteredVideos.length;
           _isSearching = false;
         });
+        // Update provider so active video system can access search results
+        ref.read(searchScreenVideosProvider.notifier).state = filteredVideos;
       }
 
       Log.info('🔍 SearchScreenPure: Local results: ${filteredVideos.length} videos', category: LogCategory.video);
+
+      // Automatically search external relays (no button needed)
+      _searchExternalRelays();
     } catch (e) {
       Log.error('🔍 SearchScreenPure: Local search failed: $e', category: LogCategory.video);
 
@@ -230,6 +236,8 @@ class _SearchScreenPureState extends ConsumerState<SearchScreenPure>
           _hasSearchedExternal = true;
           _isSearchingExternal = false;
         });
+        // Update provider so active video system can access merged search results
+        ref.read(searchScreenVideosProvider.notifier).state = uniqueVideos;
       }
 
       Log.info('🔍 SearchScreenPure: External search complete: ${remoteResults.length} new results (total: ${uniqueVideos.length})',
@@ -264,6 +272,7 @@ class _SearchScreenPureState extends ConsumerState<SearchScreenPure>
         videoList: _videoResults,
         contextTitle: 'Search: $_currentQuery',
         startingIndex: safeIndex,
+        // No onBackToGrid needed - AppShell's AppBar back button handles this
       );
     }
 
@@ -393,57 +402,6 @@ class _SearchScreenPureState extends ConsumerState<SearchScreenPure>
 
     return Column(
       children: [
-        // Show "Search external relays" banner when appropriate
-        if (!_hasSearchedExternal && !_isSearchingExternal && _currentQuery.isNotEmpty)
-          Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: VineTheme.cardBackground,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: VineTheme.vineGreen.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.cloud_sync, color: VineTheme.vineGreen, size: 24),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Found $_localResultCount local result${_localResultCount == 1 ? '' : 's'}',
-                        style: TextStyle(
-                          color: VineTheme.whiteText,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Search servers for more videos',
-                        style: TextStyle(
-                          color: VineTheme.secondaryText,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton(
-                  onPressed: _searchExternalRelays,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: VineTheme.vineGreen,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  ),
-                  child: const Text('Search'),
-                ),
-              ],
-            ),
-          ),
-
         // Show loading indicator when searching external relays
         if (_isSearchingExternal)
           Container(
@@ -473,30 +431,6 @@ class _SearchScreenPureState extends ConsumerState<SearchScreenPure>
             ),
           ),
 
-        // Show results summary after external search completes
-        if (_hasSearchedExternal && _externalResultCount > 0)
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: VineTheme.vineGreen.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.check_circle, color: VineTheme.vineGreen, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  'Found $_externalResultCount more result${_externalResultCount == 1 ? '' : 's'} from servers',
-                  style: TextStyle(
-                    color: VineTheme.whiteText,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
         // Video grid
         Expanded(
           child: ComposableVideoGrid(
@@ -515,22 +449,11 @@ class _SearchScreenPureState extends ConsumerState<SearchScreenPure>
                   Icon(Icons.video_library, size: 64, color: VineTheme.secondaryText),
                   const SizedBox(height: 16),
                   Text(
-                    'No videos found for "$_currentQuery"',
+                    _isSearchingExternal
+                        ? 'Searching servers for "$_currentQuery"...'
+                        : 'No videos found for "$_currentQuery"',
                     style: TextStyle(color: VineTheme.primaryText, fontSize: 18),
                   ),
-                  if (!_hasSearchedExternal) ...[
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _searchExternalRelays,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: VineTheme.vineGreen,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      ),
-                      icon: Icon(Icons.cloud_sync),
-                      label: const Text('Search Servers'),
-                    ),
-                  ],
                 ],
               ),
             ),

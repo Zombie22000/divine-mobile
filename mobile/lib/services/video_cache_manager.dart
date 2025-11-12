@@ -2,6 +2,7 @@
 // ABOUTME: Manages local storage of video files with intelligent cleanup and size management
 
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/io_client.dart';
 import 'package:openvine/services/broken_video_tracker.dart';
@@ -367,6 +368,16 @@ class VideoCacheManager extends CacheManager {
       Log.error('❌ Error clearing video cache: $error',
           name: 'VideoCacheManager', category: LogCategory.video);
     }
+  }
+
+  /// Reset internal state for testing purposes
+  /// This is needed because VideoCacheManager is a singleton
+  @visibleForTesting
+  void resetForTesting() {
+    _initialized = false;
+    _cacheManifest.clear();
+    Log.debug('🔄 VideoCacheManager reset for testing',
+        name: 'VideoCacheManager', category: LogCategory.video);
   }
 }
 

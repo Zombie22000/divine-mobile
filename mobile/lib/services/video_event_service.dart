@@ -1041,6 +1041,14 @@ class VideoEventService extends ChangeNotifier {
             _handleSubscriptionComplete(subscriptionType);
             if (_shouldMaintainSubscription(subscriptionType)) {
               _scheduleReconnection(subscriptionType);
+            } else {
+              // NON-PERSISTENT SUBSCRIPTION: Clean up state so future subscriptions aren't skipped as duplicates
+              // This fixes the bug where re-subscribing after stream completion gets skipped even though stream is dead
+              Log.info('🧹 Cleaning up non-persistent subscription state for $subscriptionType',
+                  name: 'VideoEventService', category: LogCategory.video);
+              _activeSubscriptions.remove(subscriptionType);
+              _subscriptionParams.remove(subscriptionType);
+              _subscriptions.remove(subscriptionId);
             }
           },
         );
@@ -3478,16 +3486,11 @@ class VideoEventService extends ChangeNotifier {
       // Subscribe to search results
       final subscription = searchStream.listen(
         (event) {
-          Log.debug('🔍 Received search event: ${event.id} kind=${event.kind}',
-              name: 'VideoEventService', category: LogCategory.video);
-
           // Parse video event (filter guarantees video kinds + reposts only)
           final videoEvent = VideoEvent.fromNostrEvent(event);
           if (_hasValidVideoUrl(videoEvent)) {
             _eventLists[SubscriptionType.search]?.add(videoEvent);
             _scheduleFrameUpdate(); // Progressive loading for search results
-            Log.debug('✅ Added valid search result: ${videoEvent.id}',
-                name: 'VideoEventService', category: LogCategory.video);
           } else {
             Log.debug(
                 '❌ Rejected search result (invalid URL): ${videoEvent.id} url=${videoEvent.videoUrl}',

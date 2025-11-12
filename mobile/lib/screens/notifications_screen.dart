@@ -137,8 +137,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
                 child: RefreshIndicator(
                   semanticsLabel: 'checking for new notifications',
                   onRefresh: () async {
-                    // TODO: Implement refresh logic
-                    await Future.delayed(const Duration(seconds: 1));
+                    await service.refreshNotifications();
                   },
                   child: ListView.builder(
                     itemCount: notifications.length,

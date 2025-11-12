@@ -125,18 +125,18 @@ void main() {
       expect(publishedEvent, isNotNull, reason: 'Event should be published');
       expect(publishedEvent!.tags, isNotEmpty, reason: 'Event must have tags');
 
-      // Find ProofMode tags
+      // Find ProofMode tags (NIP-145 standard names)
       final proofModeTags = publishedEvent!.tags
           .where((tag) => tag.isNotEmpty && tag[0] == 'proofmode')
           .toList();
       final verificationTags = publishedEvent!.tags
-          .where((tag) => tag.isNotEmpty && tag[0] == 'proof-verification-level')
+          .where((tag) => tag.isNotEmpty && tag[0] == 'verification')
           .toList();
       final attestationTags = publishedEvent!.tags
-          .where((tag) => tag.isNotEmpty && tag[0] == 'proof-device-attestation')
+          .where((tag) => tag.isNotEmpty && tag[0] == 'device_attestation')
           .toList();
       final pgpTags = publishedEvent!.tags
-          .where((tag) => tag.isNotEmpty && tag[0] == 'proof-pgp-fingerprint')
+          .where((tag) => tag.isNotEmpty && tag[0] == 'pgp_fingerprint')
           .toList();
 
       // CRITICAL: Proof data must NOT be dropped

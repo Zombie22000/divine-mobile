@@ -648,6 +648,30 @@ class NotificationServiceEnhanced {
     }
   }
 
+  /// Refresh notifications by re-subscribing to Nostr events
+  Future<void> refreshNotifications() async {
+    if (_nostrService == null || !_nostrService!.hasKeys) {
+      Log.warning('Cannot refresh notifications without Nostr keys',
+          name: 'NotificationServiceEnhanced', category: LogCategory.system);
+      return;
+    }
+
+    Log.debug('🔄 Refreshing notifications',
+        name: 'NotificationServiceEnhanced', category: LogCategory.system);
+
+    // Cancel existing subscriptions
+    for (final subscription in _subscriptions.values) {
+      await subscription.cancel();
+    }
+    _subscriptions.clear();
+
+    // Re-subscribe to Nostr events for fresh notifications
+    await _subscribeToNostrEvents();
+
+    Log.info('📱 Notifications refreshed',
+        name: 'NotificationServiceEnhanced', category: LogCategory.system);
+  }
+
   void dispose() {
     if (_disposed) return;
 

@@ -388,10 +388,10 @@ class VideoEventPublisher {
             Log.info('📜 Adding ProofMode verification tags to Nostr event',
                 name: 'VideoEventPublisher', category: LogCategory.video);
 
-            // Add verification level tag
+            // Add verification level tag (NIP-145)
             final verificationLevel = getVerificationLevel(nativeProof);
-            tags.add(['proof-verification-level', verificationLevel]);
-            Log.verbose('Added proof-verification-level tag: $verificationLevel',
+            tags.add(['verification', verificationLevel]);
+            Log.verbose('Added verification tag: $verificationLevel',
                 name: 'VideoEventPublisher', category: LogCategory.video);
 
             // Add ProofMode native proof tag (complete JSON proof data)
@@ -400,19 +400,19 @@ class VideoEventPublisher {
             Log.verbose('Added proofmode proof tag (${proofTag.length} chars)',
                 name: 'VideoEventPublisher', category: LogCategory.video);
 
-            // Add device attestation tag if available
+            // Add device attestation tag if available (NIP-145)
             final deviceTag = createDeviceAttestationTag(nativeProof);
             if (deviceTag != null) {
-              tags.add(['proof-device-attestation', deviceTag]);
-              Log.verbose('Added proof-device-attestation tag',
+              tags.add(['device_attestation', deviceTag]);
+              Log.verbose('Added device_attestation tag',
                   name: 'VideoEventPublisher', category: LogCategory.video);
             }
 
-            // Add PGP fingerprint tag if available
+            // Add PGP fingerprint tag if available (NIP-145)
             final pgpTag = createPgpFingerprintTag(nativeProof);
             if (pgpTag != null) {
-              tags.add(['proof-pgp-fingerprint', pgpTag]);
-              Log.verbose('Added proof-pgp-fingerprint tag: $pgpTag',
+              tags.add(['pgp_fingerprint', pgpTag]);
+              Log.verbose('Added pgp_fingerprint tag: $pgpTag',
                   name: 'VideoEventPublisher', category: LogCategory.video);
             }
 

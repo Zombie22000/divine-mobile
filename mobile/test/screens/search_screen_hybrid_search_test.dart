@@ -185,13 +185,14 @@ void main() {
         (WidgetTester tester) async {
       // Arrange
       when(mockVideoEventService.discoveryVideos).thenReturn([]);
+      when(mockVideoEventService.searchResults).thenReturn([]);
       when(mockVideoEventService.searchVideos(any,
               authors: anyNamed('authors'),
               since: anyNamed('since'),
               until: anyNamed('until'),
               limit: anyNamed('limit')))
           .thenAnswer(
-              (_) => Future.delayed(const Duration(milliseconds: 1000)));
+              (_) => Future.delayed(const Duration(milliseconds: 500)));
 
       // Act
       await tester.pumpWidget(
@@ -217,6 +218,10 @@ void main() {
 
       // Assert: Should show searching indicator in AppBar
       expect(find.byType(CircularProgressIndicator), findsWidgets);
+
+      // Wait for remote search to complete to avoid pending timer
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pumpAndSettle();
     });
 
     testWidgets('should extract unique users from search results',
@@ -280,8 +285,12 @@ void main() {
       expect(find.text('Users (2)'), findsOneWidget);
     });
 
-    testWidgets('should combine local and remote search results',
+    testWidgets('should combine local and remote search results (LEGACY - manual button test)',
         (WidgetTester tester) async {
+      // NOTE: This test is now DEPRECATED - automatic search is the new behavior
+      // Keeping this test to verify backward compatibility isn't broken
+      // But the new behavior is tested in "should automatically search remote relays" test
+
       // Arrange
       final localVideo = TestHelpers.createVideoEvent(
         id: 'local1',
@@ -339,22 +348,14 @@ void main() {
       await tester.pump();
       expect(find.text('Videos (1)'), findsOneWidget);
 
-      // Should show "Search servers" button
-      expect(find.text('Search servers for more videos'), findsOneWidget);
-      expect(find.widgetWithText(ElevatedButton, 'Search'), findsOneWidget);
+      // NEW BEHAVIOR: No "Search servers" button (automatic search)
+      expect(find.text('Search servers for more videos'), findsNothing);
+      expect(find.widgetWithText(ElevatedButton, 'Search'), findsNothing);
 
-      // Tap "Search servers" button to trigger remote search
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Search'));
-      await tester.pump();
-
-      // Should show loading indicator
+      // NEW BEHAVIOR: Should automatically show loading indicator
       expect(find.text('Searching servers...'), findsOneWidget);
 
-      // Wait for remote search to complete
-      await tester.pump(const Duration(milliseconds: 200));
-      await tester.pumpAndSettle();
-
-      // Verify remote search was called
+      // Verify remote search was called automatically (without button)
       verify(mockVideoEventService.searchVideos(any,
               authors: anyNamed('authors'),
               since: anyNamed('since'),
@@ -362,8 +363,99 @@ void main() {
               limit: anyNamed('limit')))
           .called(1);
 
-      // Should show results summary
-      expect(find.text('Found 1 more result from servers'), findsOneWidget);
+      // Wait for remote search to complete
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
+
+      // Results are merged seamlessly (no banner about where they came from)
+      expect(find.text('Videos (2)'), findsOneWidget);
+    });
+
+    testWidgets(
+        'should automatically search remote relays when query is entered (no button needed)',
+        (WidgetTester tester) async {
+      // Arrange
+      final localVideo = TestHelpers.createVideoEvent(
+        id: 'local1',
+        title: 'Local Bitcoin Video',
+        content: 'From local cache',
+      );
+
+      final remoteVideo = TestHelpers.createVideoEvent(
+        id: 'remote1',
+        title: 'Remote Bitcoin Video',
+        content: 'From relay',
+      );
+
+      // Start with local video in cache
+      when(mockVideoEventService.discoveryVideos).thenReturn([localVideo]);
+
+      // Initially no search results
+      when(mockVideoEventService.searchResults).thenReturn([]);
+
+      // Mock remote search with delayed results
+      when(mockVideoEventService.searchVideos(any,
+              authors: anyNamed('authors'),
+              since: anyNamed('since'),
+              until: anyNamed('until'),
+              limit: anyNamed('limit')))
+          .thenAnswer((_) async {
+        // Simulate network delay
+        await Future.delayed(const Duration(milliseconds: 200));
+        // Update search results to include remote video
+        when(mockVideoEventService.searchResults).thenReturn([remoteVideo]);
+      });
+
+      // Act
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            videoEventServiceProvider.overrideWithValue(mockVideoEventService),
+            userProfileServiceProvider
+                .overrideWithValue(mockUserProfileService),
+            videoEventsProvider
+                .overrideWith(() => _TestVideoEvents([localVideo])),
+          ],
+          child: const MaterialApp(
+            home: SearchScreenPure(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Enter search query
+      await tester.enterText(find.byType(TextField), 'bitcoin');
+      await tester.pump(const Duration(milliseconds: 300)); // Debounce delay
+
+      // Assert: Should show local results immediately
+      await tester.pump();
+      expect(find.text('Videos (1)'), findsOneWidget);
+
+      // Assert: Should NOT show "Search servers" button (automatic search)
+      expect(find.text('Search servers for more videos'), findsNothing);
+      expect(find.widgetWithText(ElevatedButton, 'Search'), findsNothing);
+
+      // Assert: Should show loading indicator for remote search
+      expect(find.text('Searching servers...'), findsOneWidget);
+
+      // Verify remote search was called automatically (without button click)
+      verify(mockVideoEventService.searchVideos(any,
+              authors: anyNamed('authors'),
+              since: anyNamed('since'),
+              until: anyNamed('until'),
+              limit: anyNamed('limit')))
+          .called(1);
+
+      // Wait for remote search to complete
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+
+      // Assert: Should show combined results (2 videos total) - seamlessly merged
+      expect(find.text('Videos (2)'), findsOneWidget);
+
+      // Assert: No banner about where results came from (seamless UX)
+      expect(find.text('Found 1 more result from servers'), findsNothing);
     });
   });
 }

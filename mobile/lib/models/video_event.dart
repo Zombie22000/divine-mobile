@@ -489,24 +489,24 @@ class VideoEvent {
     return nowTimestamp >= expirationTimestamp!;
   }
 
-  /// ProofMode: Get verification level from tags
+  /// ProofMode: Get verification level from tags (NIP-145)
   String? get proofModeVerificationLevel {
-    return rawTags['proof-verification-level'];
+    return rawTags['verification'];
   }
 
-  /// ProofMode: Get proof manifest from tags
+  /// ProofMode: Get proof manifest from tags (NIP-145)
   String? get proofModeManifest {
-    return rawTags['proof-manifest'];
+    return rawTags['proofmode'];
   }
 
-  /// ProofMode: Get device attestation from tags
+  /// ProofMode: Get device attestation from tags (NIP-145)
   String? get proofModeDeviceAttestation {
-    return rawTags['proof-device-attestation'];
+    return rawTags['device_attestation'];
   }
 
-  /// ProofMode: Get PGP public key fingerprint from tags
+  /// ProofMode: Get PGP public key fingerprint from tags (NIP-145)
   String? get proofModePgpFingerprint {
-    return rawTags['proof-pgp-fingerprint'];
+    return rawTags['pgp_fingerprint'];
   }
 
   /// ProofMode: Check if video has any proof

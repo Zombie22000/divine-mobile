@@ -157,8 +157,6 @@ class _VideoThumbnailWidgetState extends State<VideoThumbnailWidget> {
 
     if (_thumbnailUrl != null) {
       // Show the thumbnail with blurhash as placeholder while loading
-      Log.debug('🖼️ Building thumbnail: url=$_thumbnailUrl, hasBlurhash=${widget.video.blurhash != null}',
-          name: 'VideoThumbnailWidget', category: LogCategory.video);
       return Stack(
         fit: StackFit.expand,
         children: [

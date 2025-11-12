@@ -16,9 +16,9 @@ void main() {
         content: 'test video',
         timestamp: DateTime.now(),
         rawTags: {
-          'proof-verification-level': 'verified_mobile',
-          'proof-manifest': '{"test": "data"}',
-          'proof-pgp-fingerprint': 'ABC123',
+          'verification': 'verified_mobile',
+          'proofmode': '{"test": "data"}',
+          'pgp_fingerprint': 'ABC123',
         },
       );
 
@@ -38,8 +38,8 @@ void main() {
         content: 'test video',
         timestamp: DateTime.now(),
         rawTags: {
-          'proof-verification-level': 'verified_web',
-          'proof-manifest': '{"test": "data"}',
+          'verification': 'verified_web',
+          'proofmode': '{"test": "data"}',
         },
       );
 
@@ -59,8 +59,8 @@ void main() {
         content: 'test video',
         timestamp: DateTime.now(),
         rawTags: {
-          'proof-verification-level': 'basic_proof',
-          'proof-pgp-fingerprint': 'ABC123',
+          'verification': 'basic_proof',
+          'pgp_fingerprint': 'ABC123',
         },
       );
 
@@ -99,7 +99,7 @@ void main() {
         content: 'test video',
         timestamp: DateTime.now(),
         rawTags: {
-          'proof-manifest': '{"test": "data"}',
+          'proofmode': '{"test": "data"}',
         },
       );
 
@@ -113,7 +113,7 @@ void main() {
         content: 'test video',
         timestamp: DateTime.now(),
         rawTags: {
-          'proof-pgp-fingerprint': 'ABC123',
+          'pgp_fingerprint': 'ABC123',
         },
       );
 
@@ -129,7 +129,7 @@ void main() {
         content: 'test video',
         timestamp: DateTime.now(),
         rawTags: {
-          'proof-manifest': manifestJson,
+          'proofmode': manifestJson,
         },
       );
 
@@ -145,7 +145,7 @@ void main() {
         content: 'test video',
         timestamp: DateTime.now(),
         rawTags: {
-          'proof-device-attestation': attestation,
+          'device_attestation': attestation,
         },
       );
 
@@ -161,7 +161,7 @@ void main() {
         content: 'test video',
         timestamp: DateTime.now(),
         rawTags: {
-          'proof-pgp-fingerprint': fingerprint,
+          'pgp_fingerprint': fingerprint,
         },
       );
 
@@ -235,7 +235,7 @@ void main() {
         content: 'verified original vine',
         timestamp: DateTime.now(),
         rawTags: {
-          'proof-verification-level': 'verified_mobile',
+          'verification': 'verified_mobile',
         },
         originalLoops: 500000,
       );
@@ -254,7 +254,7 @@ void main() {
         content: 'new verified vine',
         timestamp: DateTime.now(),
         rawTags: {
-          'proof-verification-level': 'verified_web',
+          'verification': 'verified_web',
         },
       );
 

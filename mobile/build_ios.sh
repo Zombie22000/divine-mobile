@@ -66,7 +66,7 @@ if [ "$1" = "release" ]; then
     xcodebuild -workspace Runner.xcworkspace \
                -scheme Runner \
                -configuration Release \
-               -destination generic/platform=iOS \
+               -destination generic/platform=iOS,name="Any iOS Device" \
                -archivePath "$ORGANIZER_PATH/$ARCHIVE_NAME" \
                archive
     
