@@ -6,6 +6,10 @@ allprojects {
         maven {
             url = uri("https://raw.githubusercontent.com/guardianproject/gpmaven/master")
         }
+        // Zendesk Maven repo for Support SDK
+        maven {
+            url = uri("https://zendesk.jfrog.io/zendesk/repo")
+        }
     }
 }
 

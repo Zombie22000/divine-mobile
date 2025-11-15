@@ -7,23 +7,33 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import org.witness.proofmode.ProofMode
 import java.io.File
+import zendesk.core.Zendesk
+import zendesk.core.Identity
+import zendesk.core.AnonymousIdentity
+import zendesk.support.Support
+import zendesk.support.requestlist.RequestListActivity
+import zendesk.support.request.RequestActivity
+import zendesk.support.requestlist.RequestListConfiguration
+import zendesk.support.request.RequestConfiguration
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "org.openvine/proofmode"
-    private val TAG = "OpenVineProofMode"
+    private val PROOFMODE_CHANNEL = "org.openvine/proofmode"
+    private val ZENDESK_CHANNEL = "com.openvine/zendesk_support"
+    private val PROOFMODE_TAG = "OpenVineProofMode"
+    private val ZENDESK_TAG = "OpenVineZendesk"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         try {
             super.configureFlutterEngine(flutterEngine)
         } catch (e: Exception) {
-            Log.e(TAG, "Exception during FlutterEngine configuration", e)
-            Log.e(TAG, "Exception message: ${e.message}")
-            Log.e(TAG, "Exception cause: ${e.cause?.message}")
+            Log.e(PROOFMODE_TAG, "Exception during FlutterEngine configuration", e)
+            Log.e(PROOFMODE_TAG, "Exception message: ${e.message}")
+            Log.e(PROOFMODE_TAG, "Exception cause: ${e.cause?.message}")
 
             // Handle FFmpegKit initialization failure on Android (not needed - using continuous recording)
             // FFmpegKit is only used on iOS/macOS for video processing
             if (e.message?.contains("FFmpegKit") == true || e.cause?.message?.contains("ffmpegkit") == true) {
-                Log.w(TAG, "FFmpegKit plugin failed to initialize (expected on Android)", e)
+                Log.w(PROOFMODE_TAG, "FFmpegKit plugin failed to initialize (expected on Android)", e)
                 // Continue without FFmpegKit - Android uses camera-based continuous recording
             } else {
                 // Re-throw other exceptions
@@ -31,7 +41,15 @@ class MainActivity : FlutterActivity() {
             }
         }
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        // Set up ProofMode platform channel
+        setupProofModeChannel(flutterEngine)
+
+        // Set up Zendesk platform channel
+        setupZendeskChannel(flutterEngine)
+    }
+
+    private fun setupProofModeChannel(flutterEngine: FlutterEngine) {
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PROOFMODE_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "generateProof" -> {
                     val mediaPath = call.argument<String>("mediaPath")
@@ -41,7 +59,7 @@ class MainActivity : FlutterActivity() {
                     }
 
                     try {
-                        Log.d(TAG, "Generating proof for: $mediaPath")
+                        Log.d(PROOFMODE_TAG, "Generating proof for: $mediaPath")
 
                         // Convert file path to URI
                         val mediaFile = File(mediaPath)
@@ -56,15 +74,15 @@ class MainActivity : FlutterActivity() {
                         val proofHash = ProofMode.generateProof(this, mediaUri)
 
                         if (proofHash.isNullOrEmpty()) {
-                            Log.e(TAG, "ProofMode did not generate hash")
+                            Log.e(PROOFMODE_TAG, "ProofMode did not generate hash")
                             result.error("PROOF_HASH_MISSING", "ProofMode did not generate video hash", null)
                             return@setMethodCallHandler
                         }
 
-                        Log.d(TAG, "Proof generated successfully: $proofHash")
+                        Log.d(PROOFMODE_TAG, "Proof generated successfully: $proofHash")
                         result.success(proofHash)
                     } catch (e: Exception) {
-                        Log.e(TAG, "Failed to generate proof", e)
+                        Log.e(PROOFMODE_TAG, "Failed to generate proof", e)
                         result.error("PROOF_GENERATION_FAILED", e.message, null)
                     }
                 }
@@ -84,7 +102,7 @@ class MainActivity : FlutterActivity() {
                             result.success(null)
                         }
                     } catch (e: Exception) {
-                        Log.e(TAG, "Failed to get proof directory", e)
+                        Log.e(PROOFMODE_TAG, "Failed to get proof directory", e)
                         result.error("GET_PROOF_DIR_FAILED", e.message, null)
                     }
                 }
@@ -99,5 +117,83 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+    }
+
+    private fun setupZendeskChannel(flutterEngine: FlutterEngine) {
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, ZENDESK_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "initialize" -> {
+                    val args = call.arguments as? Map<*, *>
+                    val appId = args?.get("appId") as? String
+                    val clientId = args?.get("clientId") as? String
+                    val zendeskUrl = args?.get("zendeskUrl") as? String
+
+                    if (appId == null || clientId == null || zendeskUrl == null) {
+                        result.error("INVALID_ARGUMENT", "appId, clientId, and zendeskUrl are required", null)
+                        return@setMethodCallHandler
+                    }
+
+                    try {
+                        Log.d(ZENDESK_TAG, "Initializing Zendesk with URL: $zendeskUrl")
+
+                        // Initialize Zendesk Core SDK
+                        Zendesk.INSTANCE.init(this, zendeskUrl, appId, clientId)
+
+                        // Initialize Support SDK
+                        Support.INSTANCE.init(Zendesk.INSTANCE)
+
+                        // Set anonymous identity by default
+                        val identity: Identity = AnonymousIdentity()
+                        Zendesk.INSTANCE.setIdentity(identity)
+
+                        Log.d(ZENDESK_TAG, "Zendesk initialized successfully")
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.e(ZENDESK_TAG, "Failed to initialize Zendesk", e)
+                        result.error("INITIALIZATION_FAILED", e.message, null)
+                    }
+                }
+
+                "showNewTicket" -> {
+                    try {
+                        // Note: Subject and tags configuration not supported in basic implementation
+                        // The Zendesk SDK requires users to fill those in the UI
+                        Log.d(ZENDESK_TAG, "Showing new ticket screen")
+
+                        // Launch Zendesk request activity with default configuration
+                        RequestActivity.builder()
+                            .show(this)
+
+                        Log.d(ZENDESK_TAG, "Ticket screen shown successfully")
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.e(ZENDESK_TAG, "Failed to show ticket screen", e)
+                        result.error("SHOW_TICKET_FAILED", e.message, null)
+                    }
+                }
+
+                "showTicketList" -> {
+                    try {
+                        Log.d(ZENDESK_TAG, "Showing ticket list screen")
+
+                        // Launch Zendesk request list activity
+                        RequestListActivity.builder()
+                            .show(this)
+
+                        Log.d(ZENDESK_TAG, "Ticket list shown successfully")
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.e(ZENDESK_TAG, "Failed to show ticket list", e)
+                        result.error("SHOW_LIST_FAILED", e.message, null)
+                    }
+                }
+
+                else -> {
+                    result.notImplemented()
+                }
+            }
+        }
+
+        Log.d(ZENDESK_TAG, "Zendesk platform channel registered")
     }
 }
