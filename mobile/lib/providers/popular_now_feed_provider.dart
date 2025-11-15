@@ -44,6 +44,10 @@ class PopularNowFeed extends _$PopularNowFeed {
         );
       },
       getVideos: (service) => service.popularNowVideos,
+      filterVideos: (videos) {
+        // Filter out WebM videos on iOS/macOS (not supported by AVPlayer)
+        return videos.where((v) => v.isSupportedOnCurrentPlatform).toList();
+      },
       sortVideos: (videos) {
         final sorted = List<VideoEvent>.from(videos);
         sorted.sort((a, b) {

@@ -367,6 +367,15 @@ class UploadManager {
       Log.info('📊 File size: ${videoFile.lengthSync()} bytes',
           name: 'UploadManager', category: LogCategory.video);
     }
+
+    // Validate file format - reject WebM videos (not supported on iOS/macOS)
+    final fileName = videoFile.path.toLowerCase();
+    if (fileName.endsWith('.webm')) {
+      Log.error('❌ WebM format not supported - rejecting upload',
+          name: 'UploadManager', category: LogCategory.video);
+      throw Exception(
+          'WebM video format is not supported. Please use MP4 format instead.');
+    }
     Log.info(
         '👤 Nostr pubkey: $nostrPubkey',
         name: 'UploadManager',

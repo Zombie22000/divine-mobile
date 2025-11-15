@@ -125,6 +125,29 @@ VideoPlayerController individualVideoController(
   Log.info('🎬 Creating VideoPlayerController for video ${params.videoId.length > 8 ? params.videoId : params.videoId}...',
       name: 'IndividualVideoController', category: LogCategory.system);
 
+  // Normalize .bin URLs by replacing extension based on MIME type from event metadata
+  // CDN serves files based on hash, not extension, so we can safely rewrite for player compatibility
+  String videoUrl = params.videoUrl;
+  if (videoUrl.toLowerCase().endsWith('.bin') && params.videoEvent != null) {
+    final videoEvent = params.videoEvent as dynamic;
+    final mimeType = videoEvent.mimeType as String?;
+
+    if (mimeType != null) {
+      String? newExtension;
+      if (mimeType.contains('webm')) {
+        newExtension = '.webm';
+      } else if (mimeType.contains('mp4')) {
+        newExtension = '.mp4';
+      }
+
+      if (newExtension != null) {
+        videoUrl = videoUrl.substring(0, videoUrl.length - 4) + newExtension;
+        Log.debug('🔧 Normalized .bin URL based on MIME type $mimeType: $newExtension',
+            name: 'IndividualVideoController', category: LogCategory.video);
+      }
+    }
+  }
+
   final VideoPlayerController controller;
 
   // On web, skip file caching entirely and always use network URL
@@ -136,7 +159,7 @@ VideoPlayerController individualVideoController(
     final authHeaders = _computeAuthHeadersSync(ref, params);
 
     controller = VideoPlayerController.networkUrl(
-      Uri.parse(params.videoUrl),
+      Uri.parse(videoUrl),
       httpHeaders: authHeaders ?? {},
     );
   } else {
@@ -160,7 +183,7 @@ VideoPlayerController individualVideoController(
       final authHeaders = _computeAuthHeadersSync(ref, params);
 
       controller = VideoPlayerController.networkUrl(
-        Uri.parse(params.videoUrl),
+        Uri.parse(videoUrl),
         httpHeaders: authHeaders ?? {},
       );
 
@@ -185,28 +208,49 @@ VideoPlayerController individualVideoController(
   final timeoutDuration = isHls ? const Duration(seconds: 60) : const Duration(seconds: 30);
   final formatType = isHls ? 'HLS' : 'MP4';
 
-  // DEBUG: Add listener to track all video player value changes
-  void debugListener() {
-    final value = controller.value;
-    final position = value.position;
-    final duration = value.duration;
-    final buffered = value.buffered.isNotEmpty ? value.buffered.last.end : Duration.zero;
+  // Track significant video state changes only (initialization, errors, buffering)
+  // Previous state tracking to avoid logging every frame update
+  bool? _lastIsInitialized;
+  bool? _lastIsBuffering;
+  bool? _lastHasError;
 
-    Log.debug(
-      '🎬 VIDEO STATE CHANGE [${params.videoId}]:\n'
-      '   • Position: ${position.inMilliseconds}ms / ${duration.inMilliseconds}ms\n'
-      '   • Buffered: ${buffered.inMilliseconds}ms\n'
-      '   • Initialized: ${value.isInitialized}\n'
-      '   • Playing: ${value.isPlaying}\n'
-      '   • Buffering: ${value.isBuffering}\n'
-      '   • Size: ${value.size.width.toInt()}x${value.size.height.toInt()}\n'
-      '   • HasError: ${value.hasError}',
-      name: 'IndividualVideoController',
-      category: LogCategory.video,
-    );
+  void stateChangeListener() {
+    final value = controller.value;
+
+    // Only log significant state changes, not every position update
+    final isInitialized = value.isInitialized;
+    final isBuffering = value.isBuffering;
+    final hasError = value.hasError;
+
+    // Log only when significant state changes occur
+    if (isInitialized != _lastIsInitialized ||
+        isBuffering != _lastIsBuffering ||
+        hasError != _lastHasError) {
+
+      final position = value.position;
+      final duration = value.duration;
+      final buffered = value.buffered.isNotEmpty ? value.buffered.last.end : Duration.zero;
+
+      Log.debug(
+        '🎬 VIDEO STATE CHANGE [${params.videoId}]:\n'
+        '   • Position: ${position.inMilliseconds}ms / ${duration.inMilliseconds}ms\n'
+        '   • Buffered: ${buffered.inMilliseconds}ms\n'
+        '   • Initialized: $isInitialized\n'
+        '   • Playing: ${value.isPlaying}\n'
+        '   • Buffering: $isBuffering\n'
+        '   • Size: ${value.size.width.toInt()}x${value.size.height.toInt()}\n'
+        '   • HasError: $hasError',
+        name: 'IndividualVideoController',
+        category: LogCategory.video,
+      );
+
+      _lastIsInitialized = isInitialized;
+      _lastIsBuffering = isBuffering;
+      _lastHasError = hasError;
+    }
   }
 
-  controller.addListener(debugListener);
+  controller.addListener(stateChangeListener);
 
   final initFuture = controller.initialize().timeout(
     timeoutDuration,
@@ -339,8 +383,8 @@ VideoPlayerController individualVideoController(
     Log.info('🧹 Disposing VideoPlayerController for video ${params.videoId.length > 8 ? params.videoId : params.videoId}...',
         name: 'IndividualVideoController', category: LogCategory.system);
 
-    // Remove debug listener before disposal
-    controller.removeListener(debugListener);
+    // Remove state change listener before disposal
+    controller.removeListener(stateChangeListener);
 
     // Defer controller disposal to avoid triggering listener callbacks during lifecycle
     // This prevents "Cannot use Ref inside life-cycles" errors when listeners try to access providers

@@ -216,7 +216,7 @@ class HomeFeed extends _$HomeFeed {
     }
 
     // Get videos from the dedicated home feed list (server-side filtered to only following)
-    final followingVideos =
+    var followingVideos =
         List<VideoEvent>.from(videoEventService.homeFeedVideos);
 
     Log.info(
@@ -224,6 +224,17 @@ class HomeFeed extends _$HomeFeed {
       name: 'HomeFeedProvider',
       category: LogCategory.video,
     );
+
+    // Filter out WebM videos on iOS/macOS (not supported by AVPlayer)
+    final beforeFilter = followingVideos.length;
+    followingVideos = followingVideos.where((v) => v.isSupportedOnCurrentPlatform).toList();
+    if (beforeFilter != followingVideos.length) {
+      Log.info(
+        '🏠 HomeFeed: Filtered out ${beforeFilter - followingVideos.length} unsupported videos (WebM on iOS/macOS)',
+        name: 'HomeFeedProvider',
+        category: LogCategory.video,
+      );
+    }
 
     // DEBUG: Dump all events with cdn.divine.video thumbnails
     videoEventService.debugDumpCdnDivineVideoThumbnails();

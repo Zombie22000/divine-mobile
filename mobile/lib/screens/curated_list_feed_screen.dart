@@ -3,7 +3,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:openvine/models/video_event.dart';
 import 'package:openvine/providers/list_providers.dart';
 import 'package:openvine/providers/video_events_providers.dart';
@@ -42,7 +41,7 @@ class _CuratedListFeedScreenState
               backgroundColor: VineTheme.cardBackground,
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back, color: VineTheme.whiteText),
-                onPressed: () => context.pop(),
+                onPressed: () => Navigator.of(context).pop(),
               ),
               title: Text(
                 widget.listName,

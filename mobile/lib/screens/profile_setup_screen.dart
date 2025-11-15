@@ -576,7 +576,15 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                             child: OutlinedButton(
                               onPressed: _isPublishing
                                   ? null
-                                  : () => Navigator.of(context).pop(),
+                                  : () {
+                                      // Wait for any ongoing transitions before popping
+                                      // This prevents navigation timing race condition
+                                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                                        if (mounted) {
+                                          Navigator.of(context).pop();
+                                        }
+                                      });
+                                    },
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.white,
                                 side: const BorderSide(color: Colors.white),
@@ -982,6 +990,9 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
               Navigator.of(context).popUntil((route) => route.isFirst);
             }
           } else {
+            // Wait for SnackBar animation to complete before popping
+            // This prevents navigation timing race condition that causes black screens
+            await Future.delayed(const Duration(milliseconds: 300));
             if (mounted) {
               Navigator.of(context).pop(true); // Return true to indicate success
             }
@@ -1014,11 +1025,18 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
               ),
             );
 
+            // Wait for SnackBar animation before navigating to prevent black screen
+            await Future.delayed(const Duration(milliseconds: 300));
+
             // Still navigate back even on error, but warn user
             if (widget.isNewUser) {
-              Navigator.of(context).popUntil((route) => route.isFirst);
+              if (mounted) {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
             } else {
-              Navigator.of(context).pop(false); // Return false to indicate partial success
+              if (mounted) {
+                Navigator.of(context).pop(false); // Return false to indicate partial success
+              }
             }
           }
         }

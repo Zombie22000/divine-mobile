@@ -222,8 +222,11 @@ class ProfileVideosNotifier extends _$ProfileVideosNotifier {
           name: 'ProfileVideosProvider',
           category: LogCategory.ui);
 
-      // Sort and update UI immediately with cached videos
-      final sortedCached = List<VideoEvent>.from(cachedVideos);
+      // Filter for platform support (WebM not supported on iOS/macOS)
+      // and sort cached videos
+      final sortedCached = cachedVideos
+          .where((v) => v.isSupportedOnCurrentPlatform)
+          .toList();
       sortedCached.sort(VideoEvent.compareByLoopsThenTime);
 
       state = state.copyWith(
@@ -388,12 +391,16 @@ class ProfileVideosNotifier extends _$ProfileVideosNotifier {
       return;
     }
 
-    // Final sort using loops-first policy
-    allVideos.sort(VideoEvent.compareByLoopsThenTime);
+    // Filter for platform support (WebM not supported on iOS/macOS)
+    // and sort using loops-first policy
+    final supportedVideos = allVideos
+        .where((v) => v.isSupportedOnCurrentPlatform)
+        .toList();
+    supportedVideos.sort(VideoEvent.compareByLoopsThenTime);
 
     // Update final state
     state = state.copyWith(
-      videos: allVideos,
+      videos: supportedVideos,
       isLoading: false,
       hasMore: allVideos.length >= _profileVideosPageSize,
       lastTimestamp: allVideos.isNotEmpty ? allVideos.last.createdAt : null,
@@ -401,10 +408,10 @@ class ProfileVideosNotifier extends _$ProfileVideosNotifier {
 
     // Cache the results
     _cacheProfileVideos(
-        pubkey, allVideos, allVideos.length >= _profileVideosPageSize);
+        pubkey, supportedVideos, supportedVideos.length >= _profileVideosPageSize);
 
     Log.info(
-        '📱 Streaming finalized: loaded ${allVideos.length} videos for ${pubkey}',
+        '📱 Streaming finalized: loaded ${supportedVideos.length} videos for ${pubkey} (filtered from ${allVideos.length})',
         name: 'ProfileVideosProvider',
         category: LogCategory.ui);
   }

@@ -2,6 +2,7 @@
 // ABOUTME: Parses video metadata from Nostr events with support for kinds 22, 21, 34236, 34235
 
 import 'dart:developer' as developer;
+import 'dart:io';
 
 import 'package:nostr_sdk/event.dart';
 import 'package:openvine/services/thumbnail_api_service.dart';
@@ -785,6 +786,28 @@ class VideoEvent {
       return videoUrl?.toLowerCase().endsWith('.mp4') ?? false;
     }
     return false;
+  }
+
+  /// Check if video is WebM format
+  bool get isWebM {
+    if (mimeType != null && mimeType!.toLowerCase().contains('webm')) {
+      return true;
+    }
+    if (videoUrl != null) {
+      return videoUrl?.toLowerCase().endsWith('.webm') ?? false;
+    }
+    return false;
+  }
+
+  /// Check if video format is supported on current platform
+  /// WebM is not supported on iOS/macOS (AVPlayer limitation)
+  bool get isSupportedOnCurrentPlatform {
+    // WebM only works on Android and Web, not iOS/macOS
+    if (isWebM) {
+      return !Platform.isIOS && !Platform.isMacOS;
+    }
+    // All other formats (MP4, MOV, M4V, HLS) work on all platforms
+    return true;
   }
 
   /// Create a copy with updated fields

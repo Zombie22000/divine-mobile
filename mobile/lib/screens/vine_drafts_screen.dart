@@ -147,7 +147,15 @@ class _VineDraftsScreenState extends ConsumerState<VineDraftsScreen> {
             ),
             const SizedBox(height: 32),
             ElevatedButton.icon(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () {
+                // Wait for navigation animation to complete before allowing camera FAB to push
+                // This prevents navigation timing race condition that causes black screens
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    Navigator.of(context).pop();
+                  }
+                });
+              },
               icon: const Icon(Icons.videocam),
               label: const Text('Record a Video'),
               style: ElevatedButton.styleFrom(

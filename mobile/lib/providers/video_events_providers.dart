@@ -284,8 +284,11 @@ class VideoEvents extends _$VideoEvents {
     }
 
     // Store pending events for debounced emission (no reordering - preserve order)
+    // Filter for platform support (WebM not supported on iOS/macOS)
     // Create defensive copy ONLY when contents changed
-    _pendingEvents = List<VideoEvent>.from(newEvents);
+    _pendingEvents = newEvents
+        .where((v) => v.isSupportedOnCurrentPlatform)
+        .toList();
 
     // Cancel any existing timer
     _debounceTimer?.cancel();

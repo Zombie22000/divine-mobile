@@ -347,373 +347,361 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
   }
 
   Widget _buildListsTab() {
+    // Load data but don't wait for everything - show UI progressively
     final allListsAsync = ref.watch(allListsProvider);
-    final serviceAsync = ref.watch(curatedListServiceProvider);
 
-    return allListsAsync.when(
-      data: (data) {
-        final userLists = data.userLists;
-        final allCuratedLists = data.curatedLists;
-
-        return serviceAsync.when(
-          data: (service) {
-            // Split curated lists into user's own lists and subscribed lists
-            // Filter user's own curated lists (local lists created by user)
-            final myLists = allCuratedLists.where((list) {
-              // Lists without nostrEventId are local-only user lists
-              return list.nostrEventId == null;
-            }).toList();
-
-            // Filter subscribed lists (only lists user has explicitly subscribed to)
-            final subscribedLists = allCuratedLists.where((list) {
-              // Check if user is subscribed to this list
-              return service.isSubscribedToList(list.id);
-            }).toList();
-
-        if (userLists.isEmpty && allCuratedLists.isEmpty) {
-          return Container(
-            key: const Key('lists-tab-content'),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.library_books,
-                      size: 64, color: VineTheme.secondaryText),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No Lists Yet',
-                    style: TextStyle(
-                      color: VineTheme.primaryText,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                    ),
+    // Always show the static UI elements immediately
+    return RefreshIndicator(
+      color: VineTheme.vineGreen,
+      onRefresh: () async {
+        // Invalidate both providers to refresh
+        ref.invalidate(userListsProvider);
+        ref.invalidate(curatedListsProvider);
+      },
+      child: ListView(
+        key: const Key('lists-tab-content'),
+        children: [
+          // Discover Lists button - ALWAYS VISIBLE
+          Container(
+            margin: const EdgeInsets.all(16),
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Log.info('Tapped Discover Lists button',
+                    category: LogCategory.ui);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const DiscoverListsScreen(),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Create your first list to get started',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: VineTheme.secondaryText,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
+                );
+              },
+              icon: Icon(Icons.search, color: VineTheme.backgroundColor),
+              label: Text(
+                'Discover Lists',
+                style: TextStyle(
+                  color: VineTheme.backgroundColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: VineTheme.vineGreen,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
-          );
-        }
+          ),
 
-        return RefreshIndicator(
-          color: VineTheme.vineGreen,
-          onRefresh: () async {
-            // Invalidate both providers to refresh
-            ref.invalidate(userListsProvider);
-            ref.invalidate(curatedListsProvider);
-          },
-          child: ListView(
-            key: const Key('lists-tab-content'),
-            children: [
-              // Discover Lists button at top
-              Container(
-                margin: const EdgeInsets.all(16),
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Log.info('Tapped Discover Lists button',
-                        category: LogCategory.ui);
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const DiscoverListsScreen(),
-                      ),
-                    );
-                  },
-                  icon: Icon(Icons.search, color: VineTheme.backgroundColor),
-                  label: Text(
-                    'Discover Lists',
-                    style: TextStyle(
-                      color: VineTheme.backgroundColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: VineTheme.vineGreen,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
+          // Help text - ALWAYS VISIBLE
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: VineTheme.cardBackground,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: VineTheme.vineGreen.withValues(alpha: 0.3),
+                width: 1,
               ),
-
-              // Help text explaining lists feature
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: VineTheme.cardBackground,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: VineTheme.vineGreen.withValues(alpha: 0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Icon(Icons.info_outline,
-                            color: VineTheme.vineGreen, size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          'About Lists',
-                          style: TextStyle(
-                            color: VineTheme.whiteText,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
+                    Icon(Icons.info_outline,
+                        color: VineTheme.vineGreen, size: 20),
+                    const SizedBox(width: 8),
                     Text(
-                      'Lists help you organize and curate Divine content in two ways:',
+                      'About Lists',
                       style: TextStyle(
-                        color: VineTheme.primaryText,
-                        fontSize: 14,
-                        height: 1.5,
+                        color: VineTheme.whiteText,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.group,
-                            color: VineTheme.vineGreen, size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'People Lists',
-                                style: TextStyle(
-                                  color: VineTheme.whiteText,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Follow groups of creators and see their latest videos',
-                                style: TextStyle(
-                                  color: VineTheme.secondaryText,
-                                  fontSize: 13,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.video_library,
-                            color: VineTheme.vineGreen, size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Video Lists',
-                                style: TextStyle(
-                                  color: VineTheme.whiteText,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Create playlists of your favorite videos to watch later',
-                                style: TextStyle(
-                                  color: VineTheme.secondaryText,
-                                  fontSize: 13,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // My Lists section (user's own curated video lists)
-              if (myLists.isNotEmpty) ...[
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      Icon(Icons.video_library,
-                          color: VineTheme.vineGreen, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        'My Lists',
-                        style: TextStyle(
-                          color: VineTheme.primaryText,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 12),
+                Text(
+                  'Lists help you organize and curate Divine content in two ways:',
+                  style: TextStyle(
+                    color: VineTheme.primaryText,
+                    fontSize: 14,
+                    height: 1.5,
                   ),
                 ),
-                ...myLists.map((curatedList) => CuratedListCard(
-                      curatedList: curatedList,
-                      onTap: () {
-                        Log.info('Tapped my curated list: ${curatedList.name}',
-                            category: LogCategory.ui);
-                        // Navigate to curated list video feed
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => CuratedListFeedScreen(
-                              listId: curatedList.id,
-                              listName: curatedList.name,
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.group, color: VineTheme.vineGreen, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'People Lists',
+                            style: TextStyle(
+                              color: VineTheme.whiteText,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                        );
-                      },
-                    )),
-                const SizedBox(height: 16),
-              ],
-
-              // Subscribed Lists section (public lists from other users)
-              if (subscribedLists.isNotEmpty) ...[
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      Icon(Icons.playlist_add_check,
-                          color: VineTheme.vineGreen, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Subscribed Lists',
-                        style: TextStyle(
-                          color: VineTheme.primaryText,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                ...subscribedLists.map((curatedList) => CuratedListCard(
-                      curatedList: curatedList,
-                      onTap: () {
-                        Log.info('Tapped subscribed list: ${curatedList.name}',
-                            category: LogCategory.ui);
-                        // Navigate to curated list video feed
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => CuratedListFeedScreen(
-                              listId: curatedList.id,
-                              listName: curatedList.name,
+                          const SizedBox(height: 4),
+                          Text(
+                            'Follow groups of creators and see their latest videos',
+                            style: TextStyle(
+                              color: VineTheme.secondaryText,
+                              fontSize: 13,
+                              height: 1.4,
                             ),
                           ),
-                        );
-                      },
-                    )),
-                const SizedBox(height: 16),
-              ],
-
-              // User Lists section (people lists)
-              if (userLists.isNotEmpty) ...[
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      Icon(Icons.group,
-                          color: VineTheme.vineGreen, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        'People Lists',
-                        style: TextStyle(
-                          color: VineTheme.primaryText,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                ...userLists.map((userList) => UserListCard(
-                      userList: userList,
-                      onTap: () {
-                        Log.info('Tapped user list: ${userList.name}',
-                            category: LogCategory.ui);
-                        // Navigate to user list people screen
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                UserListPeopleScreen(userList: userList),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.video_library,
+                        color: VineTheme.vineGreen, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Video Lists',
+                            style: TextStyle(
+                              color: VineTheme.whiteText,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        );
-                      },
-                    )),
-                const SizedBox(height: 16),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Create playlists of your favorite videos to watch later',
+                            style: TextStyle(
+                              color: VineTheme.secondaryText,
+                              fontSize: 13,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ],
-            ],
+            ),
           ),
-        );
-          },
-          loading: () => Center(
-            child: CircularProgressIndicator(color: VineTheme.vineGreen),
-          ),
-          error: (_, __) => Center(
-            child: Text('Error loading subscription data',
-                style: TextStyle(color: VineTheme.likeRed)),
-          ),
-        );
-      },
-      loading: () => Center(
-        child: CircularProgressIndicator(color: VineTheme.vineGreen),
-      ),
-      error: (error, stack) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error, size: 64, color: VineTheme.likeRed),
-            const SizedBox(height: 16),
-            Text(
-              'Failed to load lists',
-              style: TextStyle(
-                color: VineTheme.likeRed,
-                fontSize: 18,
+
+          const SizedBox(height: 24),
+
+          // MY LISTS and PEOPLE LISTS - Show immediately when data available
+          allListsAsync.when(
+            data: (data) {
+              final userLists = data.userLists;
+              final myLists = data.curatedLists.where((list) {
+                // Lists without nostrEventId are local-only user lists
+                return list.nostrEventId == null;
+              }).toList();
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // My Lists section
+                  if (myLists.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: [
+                          Icon(Icons.video_library,
+                              color: VineTheme.vineGreen, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'My Lists',
+                            style: TextStyle(
+                              color: VineTheme.primaryText,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ...myLists.map((curatedList) => CuratedListCard(
+                          curatedList: curatedList,
+                          onTap: () {
+                            Log.info(
+                                'Tapped my curated list: ${curatedList.name}',
+                                category: LogCategory.ui);
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => CuratedListFeedScreen(
+                                  listId: curatedList.id,
+                                  listName: curatedList.name,
+                                ),
+                              ),
+                            );
+                          },
+                        )),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // People Lists section
+                  if (userLists.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: [
+                          Icon(Icons.group,
+                              color: VineTheme.vineGreen, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'People Lists',
+                            style: TextStyle(
+                              color: VineTheme.primaryText,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ...userLists.map((userList) => UserListCard(
+                          userList: userList,
+                          onTap: () {
+                            Log.info('Tapped user list: ${userList.name}',
+                                category: LogCategory.ui);
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    UserListPeopleScreen(userList: userList),
+                              ),
+                            );
+                          },
+                        )),
+                    const SizedBox(height: 16),
+                  ],
+                ],
+              );
+            },
+            loading: () => Padding(
+              padding: const EdgeInsets.all(16),
+              child: Center(
+                child: CircularProgressIndicator(color: VineTheme.vineGreen),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              error.toString(),
-              style: TextStyle(
-                color: VineTheme.secondaryText,
-                fontSize: 12,
+            error: (error, stack) => Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Error loading lists: $error',
+                style: TextStyle(color: VineTheme.likeRed),
               ),
-              textAlign: TextAlign.center,
+            ),
+          ),
+
+          // SUBSCRIBED LISTS - Load separately with its own loading state
+          _buildSubscribedListsSection(),
+        ],
+      ),
+    );
+  }
+
+  /// Build subscribed lists section with independent loading state
+  Widget _buildSubscribedListsSection() {
+    final allListsAsync = ref.watch(allListsProvider);
+    final serviceAsync = ref.watch(curatedListServiceProvider);
+
+    // Wait for both to load subscribed lists
+    if (!allListsAsync.hasValue || !serviceAsync.hasValue) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.playlist_add_check,
+                    color: VineTheme.vineGreen, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Subscribed Lists',
+                  style: TextStyle(
+                    color: VineTheme.primaryText,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: CircularProgressIndicator(color: VineTheme.vineGreen),
             ),
           ],
         ),
-      ),
+      );
+    }
+
+    final service = serviceAsync.value!;
+    final allCuratedLists = allListsAsync.value!.curatedLists;
+
+    // Filter subscribed lists
+    final subscribedLists = allCuratedLists.where((list) {
+      return service.isSubscribedToList(list.id);
+    }).toList();
+
+    if (subscribedLists.isEmpty) {
+      return const SizedBox.shrink(); // Don't show section if no subscribed lists
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Icon(Icons.playlist_add_check,
+                  color: VineTheme.vineGreen, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Subscribed Lists',
+                style: TextStyle(
+                  color: VineTheme.primaryText,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        ...subscribedLists.map((curatedList) => CuratedListCard(
+              curatedList: curatedList,
+              onTap: () {
+                Log.info('Tapped subscribed list: ${curatedList.name}',
+                    category: LogCategory.ui);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => CuratedListFeedScreen(
+                      listId: curatedList.id,
+                      listName: curatedList.name,
+                    ),
+                  ),
+                );
+              },
+            )),
+        const SizedBox(height: 16),
+      ],
     );
   }
 
@@ -783,8 +771,12 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
 
     return popularNowAsync.when(
       data: (feedState) {
-        final videos = feedState.videos;
-        Log.info('✅ NewVinesTab: Data state - ${videos.length} videos',
+        // Filter out WebM videos on iOS/macOS (not supported by AVPlayer)
+        final allVideos = feedState.videos;
+        final videos = allVideos
+            .where((v) => v.isSupportedOnCurrentPlatform)
+            .toList();
+        Log.info('✅ NewVinesTab: Data state - ${videos.length} videos (filtered from ${allVideos.length} total)',
             name: 'ExploreScreen', category: LogCategory.video);
 
         // Track feed loaded with videos
@@ -893,8 +885,11 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
     if (videoEventsAsync.hasValue && videoEventsAsync.value != null) {
       // Filter to show ONLY imported classic Vines (videos with originalLoops metadata)
       // New user-uploaded videos won't have this metadata and shouldn't appear here
+      // Also filter out WebM videos on iOS/macOS (not supported by AVPlayer)
       final allVideos = videoEventsAsync.value!;
-      final videos = allVideos.where((v) => v.isOriginalVine).toList();
+      final videos = allVideos
+          .where((v) => v.isOriginalVine && v.isSupportedOnCurrentPlatform)
+          .toList();
 
       Log.info('✅ TrendingTab: Data state - ${videos.length} classic Vines (filtered from ${allVideos.length} total videos)',
           name: 'ExploreScreen', category: LogCategory.video);

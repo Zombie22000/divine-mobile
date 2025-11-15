@@ -680,10 +680,21 @@ class CuratedListService {
   // === SUBSCRIPTION MANAGEMENT ===
 
   /// Subscribe to a curated list to follow its updates
-  Future<bool> subscribeToList(String listId) async {
+  /// Subscribe to a curated list (saves list data for offline access)
+  Future<bool> subscribeToList(String listId, [CuratedList? listData]) async {
     try {
-      // Check if list exists
-      final list = getListById(listId);
+      // Check if list exists in our cache
+      var list = getListById(listId);
+
+      // If list not in cache but listData provided, add it
+      if (list == null && listData != null) {
+        _lists.add(listData);
+        await _saveLists();
+        list = listData;
+        Log.debug('Added discovered list to cache: ${listData.name}',
+            name: 'CuratedListService', category: LogCategory.system);
+      }
+
       if (list == null) {
         Log.warning('Cannot subscribe - list not found: $listId',
             name: 'CuratedListService', category: LogCategory.system);

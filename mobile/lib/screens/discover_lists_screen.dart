@@ -3,7 +3,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:openvine/providers/app_providers.dart';
 import 'package:openvine/providers/list_providers.dart';
 import 'package:openvine/screens/curated_list_feed_screen.dart';
@@ -41,12 +40,18 @@ class _DiscoverListsScreenState extends ConsumerState<DiscoverListsScreen> {
       final service = await ref.read(curatedListServiceProvider.future);
       final lists = await service.fetchPublicListsFromRelays(limit: 50);
 
+      // Filter out empty lists and sort by video count (popularity)
+      final nonEmptyLists = lists
+          .where((list) => list.videoEventIds.isNotEmpty)
+          .toList()
+        ..sort((a, b) => b.videoEventIds.length.compareTo(a.videoEventIds.length));
+
       if (mounted) {
         setState(() {
-          _discoveredLists = lists;
+          _discoveredLists = nonEmptyLists;
           _isLoading = false;
         });
-        Log.info('Discovered ${lists.length} public lists',
+        Log.info('Discovered ${nonEmptyLists.length} non-empty public lists (filtered from ${lists.length} total)',
             category: LogCategory.ui);
       }
     } catch (e) {
@@ -71,7 +76,7 @@ class _DiscoverListsScreenState extends ConsumerState<DiscoverListsScreen> {
         Log.info('Unsubscribed from list: ${list.name}',
             category: LogCategory.ui);
       } else {
-        await service.subscribeToList(list.id);
+        await service.subscribeToList(list.id, list);
         Log.info('Subscribed to list: ${list.name}', category: LogCategory.ui);
       }
 
@@ -101,7 +106,7 @@ class _DiscoverListsScreenState extends ConsumerState<DiscoverListsScreen> {
         backgroundColor: VineTheme.cardBackground,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: VineTheme.whiteText),
-          onPressed: () => context.pop(),
+          onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
           'Discover Lists',

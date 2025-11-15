@@ -3,8 +3,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:openvine/models/video_event.dart';
 import 'package:openvine/providers/list_providers.dart';
 import 'package:openvine/router/nav_extensions.dart';
 import 'package:openvine/screens/pure/explore_video_screen_pure.dart';
@@ -40,7 +38,7 @@ class _UserListPeopleScreenState extends ConsumerState<UserListPeopleScreen> {
               backgroundColor: VineTheme.cardBackground,
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back, color: VineTheme.whiteText),
-                onPressed: () => context.pop(),
+                onPressed: () => Navigator.of(context).pop(),
               ),
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

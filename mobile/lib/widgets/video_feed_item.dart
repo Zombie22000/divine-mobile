@@ -419,11 +419,8 @@ class _VideoFeedItemState extends ConsumerState<VideoFeedItem> {
                           );
                         }
 
-                        Log.debug(
-                          '🎥 SHOWING VIDEO PLAYER [${video.id}] - initialized and rendering at ${value.position.inMilliseconds}ms',
-                          name: 'VideoFeedItem',
-                          category: LogCategory.video,
-                        );
+                        // Video player is initialized and rendering
+                        // (Removed per-frame log to reduce console spam)
 
                         // Always use BoxFit.contain to show the full video without cropping
                         // This applies to all aspect ratios: portrait, landscape, and square

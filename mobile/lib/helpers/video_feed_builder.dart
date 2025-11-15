@@ -16,6 +16,7 @@ class VideoFeedConfig {
     required this.subscribe,
     required this.getVideos,
     required this.sortVideos,
+    this.filterVideos,
   });
 
   /// The subscription type for this feed
@@ -29,6 +30,9 @@ class VideoFeedConfig {
 
   /// Function to sort videos for this feed
   final List<VideoEvent> Function(List<VideoEvent> videos) sortVideos;
+
+  /// Optional function to filter videos for this feed (e.g., filter out WebM on iOS/macOS)
+  final List<VideoEvent> Function(List<VideoEvent> videos)? filterVideos;
 }
 
 /// Reusable builder for video feed providers
@@ -59,8 +63,11 @@ class VideoFeedBuilder {
     // Wait for initial batch of videos to arrive
     await _waitForStability(config);
 
-    // Get and sort videos
-    final videos = config.getVideos(_service);
+    // Get, filter, and sort videos
+    var videos = config.getVideos(_service);
+    if (config.filterVideos != null) {
+      videos = config.filterVideos!(videos);
+    }
     final sortedVideos = config.sortVideos(videos);
 
     Log.info(
@@ -100,7 +107,10 @@ class VideoFeedBuilder {
         // Debounce updates to avoid excessive rebuilds
         _debounceTimer?.cancel();
         _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-          final videos = config.getVideos(_service);
+          var videos = config.getVideos(_service);
+          if (config.filterVideos != null) {
+            videos = config.filterVideos!(videos);
+          }
           final sortedVideos = config.sortVideos(videos);
 
           Log.info(
