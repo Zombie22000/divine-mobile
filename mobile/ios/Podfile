@@ -46,6 +46,9 @@ target 'Runner' do
   # Using local fork with Swift 5.x compatibility fixes
   pod 'LibProofMode', :path => 'LocalPods/LibProofMode'
 
+  # Zendesk Support SDK
+  pod 'ZendeskSupportSDK', '~> 5.3'
+
   target 'RunnerTests' do
     inherit! :search_paths
   end

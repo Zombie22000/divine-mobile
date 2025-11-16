@@ -37,6 +37,7 @@ import 'package:openvine/widgets/user_avatar.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:openvine/screens/followers_screen.dart';
 import 'package:openvine/screens/following_screen.dart';
+import 'package:openvine/widgets/delete_account_dialog.dart';
 
 /// Router-driven ProfileScreen - Instagram-style scrollable profile
 class ProfileScreenRouter extends ConsumerStatefulWidget {
@@ -1084,26 +1085,6 @@ class _ProfileScreenRouterState extends ConsumerState<ProfileScreenRouter>
                             size: 32,
                           ),
                         ),
-                        if (videoEvent.duration != null)
-                          Positioned(
-                            bottom: 4,
-                            right: 4,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.7),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                videoEvent.formattedDuration,
-                                style: const TextStyle(
-                                  color: VineTheme.whiteText,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
                       ],
                     ),
                   ),
@@ -1316,26 +1297,6 @@ class _ProfileScreenRouterState extends ConsumerState<ProfileScreenRouter>
                                 ),
                               ),
                             ),
-                            if (videoEvent.duration != null)
-                              Positioned(
-                                bottom: 4,
-                                right: 4,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.7),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    videoEvent.formattedDuration,
-                                    style: const TextStyle(
-                                      color: VineTheme.whiteText,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
                           ],
                         ),
                       ),
@@ -1367,10 +1328,106 @@ class _ProfileScreenRouterState extends ConsumerState<ProfileScreenRouter>
   }
 
   Future<void> _editProfile() async {
-    print('🔍 NAV DEBUG: ProfileScreenRouter._editProfile() - about to push /edit-profile');
-    print('🔍 NAV DEBUG: Current location: ${GoRouterState.of(context).uri}');
-    await context.push('/edit-profile');
-    print('🔍 NAV DEBUG: Returned from push /edit-profile');
+    // Show menu with Edit Profile and Delete Account options
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: VineTheme.cardBackground,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit, color: VineTheme.vineGreen),
+              title: const Text(
+                'Edit Profile',
+                style: TextStyle(color: VineTheme.whiteText),
+              ),
+              subtitle: const Text(
+                'Update your display name, bio, and avatar',
+                style: TextStyle(color: VineTheme.secondaryText, fontSize: 12),
+              ),
+              onTap: () => Navigator.pop(context, 'edit'),
+            ),
+            const Divider(color: VineTheme.secondaryText, height: 1),
+            ListTile(
+              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text(
+                'Delete Account and Data',
+                style: TextStyle(color: Colors.red),
+              ),
+              subtitle: const Text(
+                'PERMANENTLY delete your account and all content',
+                style: TextStyle(color: VineTheme.secondaryText, fontSize: 12),
+              ),
+              onTap: () => Navigator.pop(context, 'delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == 'edit') {
+      print('🔍 NAV DEBUG: ProfileScreenRouter._editProfile() - about to push /edit-profile');
+      print('🔍 NAV DEBUG: Current location: ${GoRouterState.of(context).uri}');
+      await context.push('/edit-profile');
+      print('🔍 NAV DEBUG: Returned from push /edit-profile');
+    } else if (result == 'delete') {
+      _handleDeleteAccount();
+    }
+  }
+
+  Future<void> _handleDeleteAccount() async {
+    final deletionService = ref.read(accountDeletionServiceProvider);
+    final authService = ref.read(authServiceProvider);
+
+    // Show double-confirmation warning dialogs (imported from delete_account_dialog.dart)
+    await showDeleteAllContentWarningDialog(
+      context: context,
+      onConfirm: () async {
+        // Show loading indicator
+        if (!context.mounted) return;
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(color: VineTheme.vineGreen),
+          ),
+        );
+
+        // Execute NIP-62 deletion request
+        final result = await deletionService.deleteAccount();
+
+        // Close loading indicator
+        if (!context.mounted) return;
+        Navigator.of(context).pop();
+
+        if (result.success) {
+          // Sign out and delete keys
+          await authService.signOut(deleteKeys: true);
+
+          // Show completion dialog
+          if (!context.mounted) return;
+          await showDeleteAccountCompletionDialog(
+            context: context,
+            onCreateNewAccount: () {
+              context.go('/setup-profile');
+            },
+          );
+        } else {
+          // Show error
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                result.error ?? 'Failed to delete content from relays',
+                style: const TextStyle(color: Colors.white),
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
+    );
   }
 
   Future<void> _shareProfile(String userIdHex) async {
