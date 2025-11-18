@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
+import 'package:openvine/utils/unified_logger.dart';
 
 class VineCameraScreen extends StatefulWidget {
   const VineCameraScreen({super.key});
@@ -17,6 +18,7 @@ class _VineCameraScreenState extends State<VineCameraScreen> {
   CameraController? _controller;
   bool _isInitialized = false;
   bool _isRecording = false;
+  bool _isSwitchingCamera = false;
   String? _errorMessage;
   FlashMode _flashMode = FlashMode.off;
   List<CameraDescription> _availableCameras = [];
@@ -25,29 +27,53 @@ class _VineCameraScreenState extends State<VineCameraScreen> {
   @override
   void initState() {
     super.initState();
+    Log.info('📹 VineCameraScreen.initState() - Starting camera initialization',
+        name: 'VineCameraScreen', category: LogCategory.system);
     _initializeCamera();
   }
 
   @override
   void dispose() {
+    Log.info('📹 VineCameraScreen.dispose() - Cleaning up camera controller',
+        name: 'VineCameraScreen', category: LogCategory.system);
     _controller?.dispose();
     super.dispose();
   }
 
   Future<void> _initializeCamera() async {
     try {
+      Log.info('📹 Getting available cameras...',
+          name: 'VineCameraScreen', category: LogCategory.system);
+
       // Get available cameras
       _availableCameras = await availableCameras();
+
+      if (!mounted) {
+        Log.warning('📹 Widget unmounted during availableCameras(), aborting initialization',
+            name: 'VineCameraScreen', category: LogCategory.system);
+        return;
+      }
+
+      Log.info('📹 Found ${_availableCameras.length} cameras',
+          name: 'VineCameraScreen', category: LogCategory.system);
+
       if (_availableCameras.isEmpty) {
-        setState(() {
-          _errorMessage = 'No cameras found';
-        });
+        Log.error('📹 No cameras available',
+            name: 'VineCameraScreen', category: LogCategory.system);
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'No cameras found';
+          });
+        }
         return;
       }
 
       // Use the first camera (usually back camera)
       _currentCameraIndex = 0;
       final camera = _availableCameras[_currentCameraIndex];
+
+      Log.info('📹 Initializing camera: ${camera.name} (${camera.lensDirection})',
+          name: 'VineCameraScreen', category: LogCategory.system);
 
       // Initialize camera controller
       _controller = CameraController(
@@ -56,10 +82,33 @@ class _VineCameraScreenState extends State<VineCameraScreen> {
         enableAudio: true,
       );
 
+      Log.info('📹 Calling controller.initialize()...',
+          name: 'VineCameraScreen', category: LogCategory.system);
+
       await _controller!.initialize();
+
+      if (!mounted) {
+        Log.warning('📹 Widget unmounted during controller.initialize(), disposing controller',
+            name: 'VineCameraScreen', category: LogCategory.system);
+        _controller?.dispose();
+        return;
+      }
+
+      Log.info('📹 Camera initialized, locking orientation to portraitUp',
+          name: 'VineCameraScreen', category: LogCategory.system);
 
       // Lock camera orientation to portrait
       await _controller!.lockCaptureOrientation(DeviceOrientation.portraitUp);
+
+      if (!mounted) {
+        Log.warning('📹 Widget unmounted during lockCaptureOrientation(), disposing controller',
+            name: 'VineCameraScreen', category: LogCategory.system);
+        _controller?.dispose();
+        return;
+      }
+
+      Log.info('📹 Setting flash mode to $_flashMode',
+          name: 'VineCameraScreen', category: LogCategory.system);
 
       // Set initial flash mode
       await _controller!.setFlashMode(_flashMode);
@@ -68,48 +117,141 @@ class _VineCameraScreenState extends State<VineCameraScreen> {
         setState(() {
           _isInitialized = true;
         });
+        Log.info('📹 ✅ Camera initialization complete!',
+            name: 'VineCameraScreen', category: LogCategory.system);
+      } else {
+        Log.warning('📹 Widget unmounted after initialization, disposing controller',
+            name: 'VineCameraScreen', category: LogCategory.system);
+        _controller?.dispose();
       }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to initialize camera: $e';
-      });
+    } catch (e, stackTrace) {
+      Log.error('📹 ❌ Camera initialization failed: $e',
+          name: 'VineCameraScreen', category: LogCategory.system);
+      Log.debug('Stack trace: $stackTrace',
+          name: 'VineCameraScreen', category: LogCategory.system);
+
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to initialize camera: $e';
+        });
+      }
     }
   }
 
   // Mobile recording: press-hold pattern
   Future<void> _startRecording() async {
-    if (_controller == null || !_controller!.value.isInitialized) {
+    Log.info('📹 _startRecording() called',
+        name: 'VineCameraScreen', category: LogCategory.system);
+
+    if (!mounted) {
+      Log.warning('📹 Cannot start recording - widget not mounted',
+          name: 'VineCameraScreen', category: LogCategory.system);
       return;
     }
-    if (_isRecording) return;
+
+    if (_controller == null) {
+      Log.warning('📹 Cannot start recording - controller is null',
+          name: 'VineCameraScreen', category: LogCategory.system);
+      return;
+    }
+
+    if (!_controller!.value.isInitialized) {
+      Log.warning('📹 Cannot start recording - controller not initialized',
+          name: 'VineCameraScreen', category: LogCategory.system);
+      return;
+    }
+
+    if (_isRecording) {
+      Log.debug('📹 Already recording, ignoring start request',
+          name: 'VineCameraScreen', category: LogCategory.system);
+      return;
+    }
+
+    if (_isSwitchingCamera) {
+      Log.warning('📹 Cannot start recording - camera switch in progress',
+          name: 'VineCameraScreen', category: LogCategory.system);
+      return;
+    }
 
     try {
+      Log.info('📹 Starting video recording...',
+          name: 'VineCameraScreen', category: LogCategory.system);
+
       await _controller!.startVideoRecording();
-      setState(() {
-        _isRecording = true;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Recording error: $e';
-      });
+
+      if (mounted) {
+        setState(() {
+          _isRecording = true;
+        });
+        Log.info('📹 ✅ Video recording started',
+            name: 'VineCameraScreen', category: LogCategory.system);
+      }
+    } catch (e, stackTrace) {
+      Log.error('📹 ❌ Failed to start recording: $e',
+          name: 'VineCameraScreen', category: LogCategory.system);
+      Log.debug('Stack trace: $stackTrace',
+          name: 'VineCameraScreen', category: LogCategory.system);
+
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Recording error: $e';
+        });
+      }
     }
   }
 
   Future<void> _stopRecording() async {
-    if (_controller == null || !_controller!.value.isInitialized) {
+    Log.info('📹 _stopRecording() called',
+        name: 'VineCameraScreen', category: LogCategory.system);
+
+    if (!mounted) {
+      Log.warning('📹 Cannot stop recording - widget not mounted',
+          name: 'VineCameraScreen', category: LogCategory.system);
       return;
     }
-    if (!_isRecording) return;
+
+    if (_controller == null) {
+      Log.warning('📹 Cannot stop recording - controller is null',
+          name: 'VineCameraScreen', category: LogCategory.system);
+      return;
+    }
+
+    if (!_controller!.value.isInitialized) {
+      Log.warning('📹 Cannot stop recording - controller not initialized',
+          name: 'VineCameraScreen', category: LogCategory.system);
+      return;
+    }
+
+    if (!_isRecording) {
+      Log.debug('📹 Not recording, ignoring stop request',
+          name: 'VineCameraScreen', category: LogCategory.system);
+      return;
+    }
 
     try {
+      Log.info('📹 Stopping video recording...',
+          name: 'VineCameraScreen', category: LogCategory.system);
+
       await _controller!.stopVideoRecording();
-      setState(() {
-        _isRecording = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Recording error: $e';
-      });
+
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+        });
+        Log.info('📹 ✅ Video recording stopped',
+            name: 'VineCameraScreen', category: LogCategory.system);
+      }
+    } catch (e, stackTrace) {
+      Log.error('📹 ❌ Failed to stop recording: $e',
+          name: 'VineCameraScreen', category: LogCategory.system);
+      Log.debug('Stack trace: $stackTrace',
+          name: 'VineCameraScreen', category: LogCategory.system);
+
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Recording error: $e';
+        });
+      }
     }
   }
 
@@ -122,7 +264,12 @@ class _VineCameraScreenState extends State<VineCameraScreen> {
     }
   }
 
-  bool get _canRecord => _controller != null && _controller!.value.isInitialized && !_isRecording;
+  bool get _canRecord =>
+      _controller != null &&
+      _controller!.value.isInitialized &&
+      !_isRecording &&
+      !_isSwitchingCamera &&
+      mounted;
 
   // Toggle flash mode: off → torch → off
   Future<void> _toggleFlash() async {
@@ -141,16 +288,56 @@ class _VineCameraScreenState extends State<VineCameraScreen> {
 
   // Switch between front and back cameras
   Future<void> _switchCamera() async {
-    if (_availableCameras.length <= 1) return;
-    if (_controller == null || !_controller!.value.isInitialized) return;
+    Log.info('📹 _switchCamera() called',
+        name: 'VineCameraScreen', category: LogCategory.system);
+
+    if (_availableCameras.length <= 1) {
+      Log.debug('📹 Only one camera available, cannot switch',
+          name: 'VineCameraScreen', category: LogCategory.system);
+      return;
+    }
+
+    if (_controller == null || !_controller!.value.isInitialized) {
+      Log.warning('📹 Cannot switch camera - controller not initialized',
+          name: 'VineCameraScreen', category: LogCategory.system);
+      return;
+    }
+
+    if (_isSwitchingCamera) {
+      Log.warning('📹 Camera switch already in progress',
+          name: 'VineCameraScreen', category: LogCategory.system);
+      return;
+    }
+
+    if (!mounted) {
+      Log.warning('📹 Cannot switch camera - widget not mounted',
+          name: 'VineCameraScreen', category: LogCategory.system);
+      return;
+    }
 
     try {
+      setState(() {
+        _isSwitchingCamera = true;
+      });
+
+      Log.info('📹 Disposing old camera controller...',
+          name: 'VineCameraScreen', category: LogCategory.system);
+
       // Dispose old controller first
       await _controller!.dispose();
+
+      if (!mounted) {
+        Log.warning('📹 Widget unmounted during camera switch',
+            name: 'VineCameraScreen', category: LogCategory.system);
+        return;
+      }
 
       // Switch to next camera
       _currentCameraIndex = (_currentCameraIndex + 1) % _availableCameras.length;
       final camera = _availableCameras[_currentCameraIndex];
+
+      Log.info('📹 Switching to camera: ${camera.name} (${camera.lensDirection})',
+          name: 'VineCameraScreen', category: LogCategory.system);
 
       // Initialize new camera
       _controller = CameraController(
@@ -159,17 +346,54 @@ class _VineCameraScreenState extends State<VineCameraScreen> {
         enableAudio: true,
       );
 
+      Log.info('📹 Initializing new camera controller...',
+          name: 'VineCameraScreen', category: LogCategory.system);
+
       await _controller!.initialize();
+
+      if (!mounted) {
+        Log.warning('📹 Widget unmounted during new camera init',
+            name: 'VineCameraScreen', category: LogCategory.system);
+        _controller?.dispose();
+        return;
+      }
+
+      Log.info('📹 Locking new camera to portrait orientation...',
+          name: 'VineCameraScreen', category: LogCategory.system);
+
       await _controller!.lockCaptureOrientation(DeviceOrientation.portraitUp);
+
+      if (!mounted) {
+        Log.warning('📹 Widget unmounted during orientation lock',
+            name: 'VineCameraScreen', category: LogCategory.system);
+        _controller?.dispose();
+        return;
+      }
+
+      Log.info('📹 Setting flash mode on new camera...',
+          name: 'VineCameraScreen', category: LogCategory.system);
+
       await _controller!.setFlashMode(_flashMode);
 
       if (mounted) {
-        setState(() {});
+        setState(() {
+          _isSwitchingCamera = false;
+        });
+        Log.info('📹 ✅ Camera switch complete!',
+            name: 'VineCameraScreen', category: LogCategory.system);
       }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to switch camera: $e';
-      });
+    } catch (e, stackTrace) {
+      Log.error('📹 ❌ Failed to switch camera: $e',
+          name: 'VineCameraScreen', category: LogCategory.system);
+      Log.debug('Stack trace: $stackTrace',
+          name: 'VineCameraScreen', category: LogCategory.system);
+
+      if (mounted) {
+        setState(() {
+          _isSwitchingCamera = false;
+          _errorMessage = 'Failed to switch camera: $e';
+        });
+      }
     }
   }
 
