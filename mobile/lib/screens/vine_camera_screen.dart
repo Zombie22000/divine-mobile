@@ -415,30 +415,12 @@ class _VineCameraScreenState extends State<VineCameraScreen> {
         _isRecording = false;
       }
 
-      setState(() {
-        _isSwitchingCamera = true;
-      });
-
-      // Wait for next frame to ensure loading indicator is shown
-      await Future.delayed(const Duration(milliseconds: 16)); // One frame at 60fps
-
-      if (!mounted) {
-        Log.warning('📹 Widget unmounted before disposing',
-            name: 'VineCameraScreen', category: LogCategory.system);
-        return;
-      }
-
+      // Don't show loading indicator - keep preview visible during switch
       Log.info('📹 Disposing old camera controller...',
           name: 'VineCameraScreen', category: LogCategory.system);
 
-      // Dispose old controller first
-      await _controller!.dispose();
-
-      if (!mounted) {
-        Log.warning('📹 Widget unmounted during camera switch',
-            name: 'VineCameraScreen', category: LogCategory.system);
-        return;
-      }
+      // Store old controller to dispose after new one is ready
+      final oldController = _controller;
 
       // Toggle between front and back
       _isFrontCamera = !_isFrontCamera;
@@ -449,7 +431,7 @@ class _VineCameraScreenState extends State<VineCameraScreen> {
       Log.info('📹 Switching to camera: ${camera.name} (${camera.lensDirection})',
           name: 'VineCameraScreen', category: LogCategory.system);
 
-      // Initialize new camera
+      // Initialize new camera BEFORE disposing old one
       _controller = CameraController(
         camera,
         ResolutionPreset.high,
@@ -465,6 +447,7 @@ class _VineCameraScreenState extends State<VineCameraScreen> {
         Log.warning('📹 Widget unmounted during new camera init',
             name: 'VineCameraScreen', category: LogCategory.system);
         _controller?.dispose();
+        oldController?.dispose();
         return;
       }
 
@@ -477,6 +460,7 @@ class _VineCameraScreenState extends State<VineCameraScreen> {
         Log.warning('📹 Widget unmounted during orientation lock',
             name: 'VineCameraScreen', category: LogCategory.system);
         _controller?.dispose();
+        oldController?.dispose();
         return;
       }
 
@@ -484,6 +468,11 @@ class _VineCameraScreenState extends State<VineCameraScreen> {
           name: 'VineCameraScreen', category: LogCategory.system);
 
       await _controller!.setFlashMode(_flashMode);
+
+      // Now dispose the old controller after new one is ready
+      oldController?.dispose();
+      Log.info('📹 Disposed old camera controller',
+          name: 'VineCameraScreen', category: LogCategory.system);
 
       if (mounted) {
         setState(() {
@@ -569,30 +558,12 @@ class _VineCameraScreenState extends State<VineCameraScreen> {
         _isRecording = false;
       }
 
-      setState(() {
-        _isSwitchingCamera = true;
-      });
-
-      // Wait for next frame to ensure loading indicator is shown
-      await Future.delayed(const Duration(milliseconds: 16)); // One frame at 60fps
-
-      if (!mounted) {
-        Log.warning('📹 Widget unmounted before disposing',
-            name: 'VineCameraScreen', category: LogCategory.system);
-        return;
-      }
-
+      // Don't show loading indicator - keep preview visible during switch
       Log.info('📹 Disposing old camera controller...',
           name: 'VineCameraScreen', category: LogCategory.system);
 
-      // Dispose old controller first
-      await _controller!.dispose();
-
-      if (!mounted) {
-        Log.warning('📹 Widget unmounted during zoom switch',
-            name: 'VineCameraScreen', category: LogCategory.system);
-        return;
-      }
+      // Store old controller to dispose after new one is ready
+      final oldController = _controller;
 
       // Cycle to next rear camera
       _currentRearCameraIndex = (_currentRearCameraIndex + 1) % _rearCameras.length;
@@ -601,7 +572,7 @@ class _VineCameraScreenState extends State<VineCameraScreen> {
       Log.info('📹 Switching to rear camera ${_currentRearCameraIndex + 1}/${_rearCameras.length}: ${camera.name}',
           name: 'VineCameraScreen', category: LogCategory.system);
 
-      // Initialize new camera
+      // Initialize new camera BEFORE disposing old one
       _controller = CameraController(
         camera,
         ResolutionPreset.high,
@@ -617,6 +588,7 @@ class _VineCameraScreenState extends State<VineCameraScreen> {
         Log.warning('📹 Widget unmounted during new camera init',
             name: 'VineCameraScreen', category: LogCategory.system);
         _controller?.dispose();
+        oldController?.dispose();
         return;
       }
 
@@ -629,6 +601,7 @@ class _VineCameraScreenState extends State<VineCameraScreen> {
         Log.warning('📹 Widget unmounted during orientation lock',
             name: 'VineCameraScreen', category: LogCategory.system);
         _controller?.dispose();
+        oldController?.dispose();
         return;
       }
 
@@ -636,6 +609,11 @@ class _VineCameraScreenState extends State<VineCameraScreen> {
           name: 'VineCameraScreen', category: LogCategory.system);
 
       await _controller!.setFlashMode(_flashMode);
+
+      // Now dispose the old controller after new one is ready
+      oldController?.dispose();
+      Log.info('📹 Disposed old camera controller',
+          name: 'VineCameraScreen', category: LogCategory.system);
 
       if (mounted) {
         setState(() {
