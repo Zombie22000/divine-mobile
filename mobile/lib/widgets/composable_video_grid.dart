@@ -125,7 +125,6 @@ class ComposableVideoGrid extends ConsumerWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(0),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
               // Video thumbnail with play overlay
               AspectRatio(
@@ -194,13 +193,12 @@ class ComposableVideoGrid extends ConsumerWidget {
                   ],
                 ),
               ),
-              // Video info - wrapped in Flexible to prevent overflow
-              Flexible(
+              // Video info - wrapped in Expanded to fill remaining space
+              Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(6),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
                     children: [
                     // Creator name
                     _buildCreatorName(ref, video),

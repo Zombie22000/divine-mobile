@@ -17,6 +17,7 @@ import 'package:openvine/screens/pure/search_screen_pure.dart';
 import 'package:openvine/screens/pure/universal_camera_screen_pure.dart';
 import 'package:openvine/screens/followers_screen.dart';
 import 'package:openvine/screens/following_screen.dart';
+import 'package:openvine/screens/key_import_screen.dart';
 import 'package:openvine/screens/profile_setup_screen.dart';
 import 'package:openvine/screens/settings_screen.dart';
 import 'package:openvine/screens/video_detail_screen.dart';
@@ -58,6 +59,7 @@ int tabIndexFromLocation(String loc) {
     case 'settings':
     case 'edit-profile':
     case 'setup-profile':
+    case 'import-key':
     case 'camera':
     case 'drafts':
     case 'followers':
@@ -298,6 +300,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/welcome',
         name: 'welcome',
         builder: (_, __) => const WelcomeScreen(),
+      ),
+      GoRoute(
+        path: '/import-key',
+        name: 'import-key',
+        builder: (_, __) => const KeyImportScreen(),
       ),
       GoRoute(
         path: '/camera',

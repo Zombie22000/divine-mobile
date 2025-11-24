@@ -421,36 +421,6 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
                                             : 9.0 / 16.0,
                                         child: VideoPlayer(_videoController!),
                                       ),
-                                      // Play/pause overlay
-                                      Positioned(
-                                        bottom: 8,
-                                        right: 8,
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.black.withValues(alpha: 0.6),
-                                            borderRadius: BorderRadius.circular(20),
-                                          ),
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Icon(
-                                                Icons.loop,
-                                                color: Colors.white,
-                                                size: 16,
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                _formatDuration(_videoController?.value.duration ?? Duration.zero),
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
                                     ],
                                   )
                                 : Column(
@@ -778,13 +748,6 @@ class _VideoMetadataScreenPureState extends ConsumerState<VideoMetadataScreenPur
     setState(() {
       _hashtags.remove(hashtag);
     });
-  }
-
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
-    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
-    return '${duration.inHours > 0 ? '${twoDigits(duration.inHours)}:' : ''}$twoDigitMinutes:$twoDigitSeconds';
   }
 
   String _formatExpirationDuration() {
