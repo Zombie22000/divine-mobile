@@ -1106,6 +1106,20 @@ class _UniversalCameraScreenPureState
   }
 
   void _finishRecording() async {
+    // Set processing state immediately so UI shows "Processing video..."
+    // during the entire FFmpeg processing time
+    if (_isProcessing) {
+      Log.warning(
+        '📹 Already processing a recording, ignoring duplicate finish call',
+        category: LogCategory.video,
+      );
+      return;
+    }
+
+    setState(() {
+      _isProcessing = true;
+    });
+
     try {
       final notifier = ref.read(vineRecordingProvider.notifier);
       Log.info(
@@ -1126,12 +1140,25 @@ class _UniversalCameraScreenPureState
           '📹 No file returned from finishRecording',
           category: LogCategory.video,
         );
+        // Reset processing state since nothing to process
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+          });
+        }
       }
     } catch (e) {
       Log.error(
         '📹 UniversalCameraScreenPure: Finish recording failed: $e',
         category: LogCategory.video,
       );
+
+      // Reset processing state on error
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
 
       _showErrorSnackBar('Finish recording failed: $e');
     }
@@ -1240,18 +1267,8 @@ class _UniversalCameraScreenPureState
     File recordedFile,
     NativeProofData? nativeProof,
   ) async {
-    // Guard against double-processing
-    if (_isProcessing) {
-      Log.warning(
-        '📹 Already processing a recording, ignoring duplicate call',
-        category: LogCategory.video,
-      );
-      return;
-    }
-
-    setState(() {
-      _isProcessing = true;
-    });
+    // Note: _isProcessing is set by _finishRecording() before this is called
+    // to ensure the "Processing video..." UI shows during FFmpeg processing
 
     try {
       Log.info(
