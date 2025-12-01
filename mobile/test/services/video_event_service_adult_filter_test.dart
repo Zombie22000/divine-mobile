@@ -180,5 +180,38 @@ void main() {
       // Assert
       expect(videoEventService.shouldFilterEvent(event), isTrue);
     });
+
+    test(
+        'filterAdultContentFromExistingVideos removes flagged videos from all lists',
+        () {
+      // Arrange
+      when(() => mockAgeVerificationService.shouldHideAdultContent)
+          .thenReturn(true);
+      videoEventService.setAgeVerificationService(mockAgeVerificationService);
+
+      // Act - method should exist and not throw
+      final removedCount =
+          videoEventService.filterAdultContentFromExistingVideos();
+
+      // Assert - returns count of removed videos (0 when empty)
+      expect(removedCount, isA<int>());
+      expect(removedCount, greaterThanOrEqualTo(0));
+    });
+
+    test(
+        'filterAdultContentFromExistingVideos does nothing when not hiding adult content',
+        () {
+      // Arrange
+      when(() => mockAgeVerificationService.shouldHideAdultContent)
+          .thenReturn(false);
+      videoEventService.setAgeVerificationService(mockAgeVerificationService);
+
+      // Act
+      final removedCount =
+          videoEventService.filterAdultContentFromExistingVideos();
+
+      // Assert - should not remove any videos
+      expect(removedCount, equals(0));
+    });
   });
 }

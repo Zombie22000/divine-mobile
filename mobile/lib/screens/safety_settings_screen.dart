@@ -42,6 +42,21 @@ class _SafetySettingsScreenState extends ConsumerState<SafetySettingsScreen> {
   Future<void> _setAgeVerified(bool value) async {
     final service = ref.read(ageVerificationServiceProvider);
     await service.setAdultContentVerified(value);
+
+    // If user says they're under 18, force preference to "Never show"
+    if (!value && _preference != AdultContentPreference.neverShow) {
+      await service.setAdultContentPreference(AdultContentPreference.neverShow);
+      final videoEventService = ref.read(videoEventServiceProvider);
+      videoEventService.filterAdultContentFromExistingVideos();
+      if (mounted) {
+        setState(() {
+          _isAgeVerified = value;
+          _preference = AdultContentPreference.neverShow;
+        });
+      }
+      return;
+    }
+
     if (mounted) {
       setState(() {
         _isAgeVerified = value;
@@ -52,6 +67,13 @@ class _SafetySettingsScreenState extends ConsumerState<SafetySettingsScreen> {
   Future<void> _setPreference(AdultContentPreference value) async {
     final service = ref.read(ageVerificationServiceProvider);
     await service.setAdultContentPreference(value);
+
+    // If user chose to never show adult content, filter existing videos from feeds
+    if (value == AdultContentPreference.neverShow) {
+      final videoEventService = ref.read(videoEventServiceProvider);
+      videoEventService.filterAdultContentFromExistingVideos();
+    }
+
     if (mounted) {
       setState(() {
         _preference = value;

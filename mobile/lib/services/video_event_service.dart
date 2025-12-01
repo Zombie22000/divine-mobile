@@ -250,6 +250,67 @@ class VideoEventService extends ChangeNotifier {
     return false;
   }
 
+  /// Check if a VideoEvent contains adult content based on hashtags and tags
+  bool _isAdultContent(VideoEvent video) {
+    // Check for NSFW or adult hashtags
+    for (final hashtag in video.hashtags) {
+      final lowerHashtag = hashtag.toLowerCase();
+      if (lowerHashtag == 'nsfw' || lowerHashtag == 'adult') {
+        return true;
+      }
+    }
+
+    // Check for content-warning in rawTags
+    if (video.rawTags.containsKey('content-warning')) {
+      return true;
+    }
+
+    // Check isFlaggedContent flag
+    if (video.isFlaggedContent) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /// Filter adult content from all existing video lists
+  /// Call this when user changes preference to "Never show"
+  /// Returns the count of removed videos
+  int filterAdultContentFromExistingVideos() {
+    // If not hiding adult content, don't filter anything
+    if (!shouldFilterAdultContent) {
+      return 0;
+    }
+
+    int totalRemoved = 0;
+
+    // Iterate through all subscription types and filter each list
+    for (final subscriptionType in SubscriptionType.values) {
+      final eventList = _eventLists[subscriptionType];
+      if (eventList == null || eventList.isEmpty) continue;
+
+      final beforeCount = eventList.length;
+      eventList.removeWhere(_isAdultContent);
+      final removedFromList = beforeCount - eventList.length;
+
+      if (removedFromList > 0) {
+        Log.info(
+            'Filtered $removedFromList adult content videos from ${subscriptionType.name}',
+            name: 'VideoEventService',
+            category: LogCategory.video);
+        totalRemoved += removedFromList;
+      }
+    }
+
+    if (totalRemoved > 0) {
+      Log.info('Total adult content videos filtered: $totalRemoved',
+          name: 'VideoEventService', category: LogCategory.video);
+      notifyListeners();
+    }
+
+    return totalRemoved;
+  }
+
   /// Initialize pagination states for all subscription types
   void _initializePaginationStates() {
     for (final subscriptionType in SubscriptionType.values) {
