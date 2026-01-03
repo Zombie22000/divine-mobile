@@ -1303,6 +1303,20 @@ class MockCuratedListService extends _i1.Mock
           as bool);
 
   @override
+  void setOnListSubscribed(_i13.OnListSubscribedCallback? callback) =>
+      super.noSuchMethod(
+        Invocation.method(#setOnListSubscribed, [callback]),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  void setOnListUnsubscribed(_i13.OnListUnsubscribedCallback? callback) =>
+      super.noSuchMethod(
+        Invocation.method(#setOnListUnsubscribed, [callback]),
+        returnValueForMissingStub: null,
+      );
+
+  @override
   _i5.Future<void> initialize() =>
       (super.noSuchMethod(
             Invocation.method(#initialize, []),
