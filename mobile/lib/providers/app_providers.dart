@@ -32,6 +32,7 @@ import 'package:openvine/services/content_deletion_service.dart';
 import 'package:openvine/services/content_reporting_service.dart';
 import 'package:openvine/services/curated_list_service.dart';
 import 'package:openvine/services/curation_service.dart';
+import 'package:openvine/services/subscribed_list_video_cache.dart';
 import 'package:openvine/services/clip_library_service.dart';
 import 'package:openvine/services/draft_storage_service.dart';
 import 'package:openvine/services/event_router.dart';
@@ -694,6 +695,37 @@ class CuratedListsState extends _$CuratedListsState {
     // When service calls notifyListeners(), update the state
     state = AsyncValue.data(_service!.lists);
   }
+}
+
+/// Subscribed list video cache for merging subscribed list videos into home feed
+/// Depends on CuratedListService which is async, so watch the state provider
+@Riverpod(keepAlive: true)
+SubscribedListVideoCache? subscribedListVideoCache(Ref ref) {
+  final nostrService = ref.watch(nostrServiceProvider);
+  final videoEventService = ref.watch(videoEventServiceProvider);
+
+  // Watch the curated lists state to get the service when ready
+  final curatedListState = ref.watch(curatedListsStateProvider);
+
+  // Only create cache when CuratedListService is available
+  final curatedListService = curatedListState.whenOrNull(
+    data: (_) => ref.read(curatedListsStateProvider.notifier).service,
+  );
+
+  // Return null if CuratedListService isn't ready yet
+  if (curatedListService == null) {
+    return null;
+  }
+
+  final cache = SubscribedListVideoCache(
+    nostrService: nostrService,
+    videoEventService: videoEventService,
+    curatedListService: curatedListService,
+  );
+
+  ref.onDispose(cache.dispose);
+
+  return cache;
 }
 
 /// User list service for NIP-51 kind 30000 people lists

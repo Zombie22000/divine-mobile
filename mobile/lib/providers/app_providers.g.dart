@@ -2274,6 +2274,62 @@ abstract class _$CuratedListsState extends $AsyncNotifier<List<CuratedList>> {
   }
 }
 
+/// Subscribed list video cache for merging subscribed list videos into home feed
+/// Depends on CuratedListService which is async, so watch the state provider
+
+@ProviderFor(subscribedListVideoCache)
+const subscribedListVideoCacheProvider = SubscribedListVideoCacheProvider._();
+
+/// Subscribed list video cache for merging subscribed list videos into home feed
+/// Depends on CuratedListService which is async, so watch the state provider
+
+final class SubscribedListVideoCacheProvider
+    extends
+        $FunctionalProvider<
+          SubscribedListVideoCache?,
+          SubscribedListVideoCache?,
+          SubscribedListVideoCache?
+        >
+    with $Provider<SubscribedListVideoCache?> {
+  /// Subscribed list video cache for merging subscribed list videos into home feed
+  /// Depends on CuratedListService which is async, so watch the state provider
+  const SubscribedListVideoCacheProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'subscribedListVideoCacheProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$subscribedListVideoCacheHash();
+
+  @$internal
+  @override
+  $ProviderElement<SubscribedListVideoCache?> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SubscribedListVideoCache? create(Ref ref) {
+    return subscribedListVideoCache(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SubscribedListVideoCache? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SubscribedListVideoCache?>(value),
+    );
+  }
+}
+
+String _$subscribedListVideoCacheHash() =>
+    r'c0542b9a2a75a37d1f4e0c11b7ba279799bf0b5b';
+
 /// User list service for NIP-51 kind 30000 people lists
 
 @ProviderFor(userListService)
