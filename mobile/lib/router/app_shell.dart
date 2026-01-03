@@ -327,11 +327,23 @@ class AppShell extends ConsumerWidget {
                     category: LogCategory.ui,
                   );
 
+                  // First, try to pop if there's something on the navigation stack
+                  // This handles pushed routes (e.g., list → profile → back to list)
+                  if (context.canPop()) {
+                    Log.info(
+                      '👈 Popping navigation stack',
+                      name: 'Navigation',
+                      category: LogCategory.ui,
+                    );
+                    context.pop();
+                    return;
+                  }
+
                   // Get current route context
                   final ctx = ref.read(pageContextProvider).asData?.value;
                   if (ctx == null) return;
 
-                  // First, check if we're in a sub-route (hashtag, search, etc.)
+                  // Check if we're in a sub-route (hashtag, search, etc.)
                   // If so, navigate back to parent route
                   switch (ctx.type) {
                     case RouteType.hashtag:

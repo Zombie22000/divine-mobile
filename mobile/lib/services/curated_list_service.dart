@@ -1,5 +1,15 @@
 // ABOUTME: Service for managing NIP-51 curated lists (kind 30005) for video collections
-// ABOUTME: Handles creation, updates, and management of user's public video lists
+// ABOUTME: Handles creation, updates, and management of user's video lists
+//
+// WARNING: "Private" lists (isPublic: false) are stored in SharedPreferences only.
+// They are EPHEMERAL - lost if user clears app data, uninstalls, or switches phones.
+// There is NO backup mechanism for private lists.
+//
+// TODO: Implement encrypted private lists using NIP-44 to encrypt list content
+// before publishing to Nostr. This would allow private lists to be backed up
+// on relays while remaining unreadable to others. Until then, "private" lists
+// are effectively broken - they provide no real privacy (just local-only) and
+// no durability (no backup).
 
 import 'dart:async';
 import 'dart:convert';
@@ -62,6 +72,7 @@ class CuratedList {
     required this.videoEventIds,
     required this.createdAt,
     required this.updatedAt,
+    this.pubkey,
     this.description,
     this.imageUrl,
     this.isPublic = true,
@@ -75,11 +86,17 @@ class CuratedList {
 
   final String id;
   final String name;
+  final String? pubkey; // Creator's pubkey for attribution
   final String? description;
   final String? imageUrl;
   final List<String> videoEventIds;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  /// Whether to publish this list to Nostr relays.
+  /// WARNING: isPublic=false means LOCAL-ONLY storage (SharedPreferences).
+  /// Private lists have NO backup - lost on app uninstall or device change.
+  /// TODO: Implement NIP-44 encrypted lists for true private + backed up lists.
   final bool isPublic;
   final String? nostrEventId;
   final List<String> tags; // Tags for categorization and discovery
@@ -91,6 +108,7 @@ class CuratedList {
   CuratedList copyWith({
     String? id,
     String? name,
+    String? pubkey,
     String? description,
     String? imageUrl,
     List<String>? videoEventIds,
@@ -106,6 +124,7 @@ class CuratedList {
   }) => CuratedList(
     id: id ?? this.id,
     name: name ?? this.name,
+    pubkey: pubkey ?? this.pubkey,
     description: description ?? this.description,
     imageUrl: imageUrl ?? this.imageUrl,
     videoEventIds: videoEventIds ?? this.videoEventIds,
@@ -123,6 +142,7 @@ class CuratedList {
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
+    'pubkey': pubkey,
     'description': description,
     'imageUrl': imageUrl,
     'videoEventIds': videoEventIds,
@@ -140,6 +160,7 @@ class CuratedList {
   static CuratedList fromJson(Map<String, dynamic> json) => CuratedList(
     id: json['id'],
     name: json['name'],
+    pubkey: json['pubkey'],
     description: json['description'],
     imageUrl: json['imageUrl'],
     videoEventIds: List<String>.from(json['videoEventIds'] ?? []),
@@ -916,12 +937,13 @@ class CuratedListService extends ChangeNotifier {
   }
 
   /// Create the default "My List" for quick access
+  /// Default list is PRIVATE - users can make it public if they want
   Future<void> _createDefaultList() async {
     await _createList(
       id: defaultListId,
       name: 'My List',
       description: 'My favorite vines and videos',
-      isPublic: true,
+      isPublic: false, // Don't spam the relay with empty default lists
     );
   }
 
@@ -931,6 +953,16 @@ class CuratedListService extends ChangeNotifier {
       if (!_authService.isAuthenticated) {
         Log.warning(
           'Cannot publish list - user not authenticated',
+          name: 'CuratedListService',
+          category: LogCategory.system,
+        );
+        return;
+      }
+
+      // Don't spam relay with empty lists
+      if (list.videoEventIds.isEmpty) {
+        Log.debug(
+          'Skipping publish of empty list: ${list.name}',
           name: 'CuratedListService',
           category: LogCategory.system,
         );
@@ -1082,7 +1114,7 @@ class CuratedListService extends ChangeNotifier {
     if (userPubkey == null) return;
 
     Log.info(
-      '📋 Fetching user\'s curated lists from relays...',
+      '📋 Fetching user\'s curated lists from relays for pubkey: $userPubkey',
       name: 'CuratedListService',
       category: LogCategory.system,
     );
@@ -1092,12 +1124,16 @@ class CuratedListService extends ChangeNotifier {
       final receivedEvents = <Event>[];
 
       // Subscribe to user's own Kind 30005 events (NIP-51 curated lists)
-      final subscription = _nostrService.subscribe([
-        Filter(
-          authors: [userPubkey],
-          kinds: [30005], // NIP-51 curated lists
-        ),
-      ]);
+      final filter = Filter(
+        authors: [userPubkey],
+        kinds: [30005], // NIP-51 curated lists
+      );
+      Log.debug(
+        '📋 Subscribing with filter: authors=[$userPubkey], kinds=[30005]',
+        name: 'CuratedListService',
+        category: LogCategory.system,
+      );
+      final subscription = _nostrService.subscribe([filter]);
 
       // Set a timeout for the subscription
       Timer? timeoutTimer;
@@ -1142,6 +1178,12 @@ class CuratedListService extends ChangeNotifier {
 
       await completer.future;
 
+      Log.info(
+        '📋 Received ${receivedEvents.length} raw list events from relays',
+        name: 'CuratedListService',
+        category: LogCategory.system,
+      );
+
       // Process received events
       if (receivedEvents.isNotEmpty) {
         await _processReceivedListEvents(receivedEvents);
@@ -1162,135 +1204,122 @@ class CuratedListService extends ChangeNotifier {
     }
   }
 
-  /// Fetch public curated lists from Nostr relays for discovery
-  /// Queries kind 30005 events WITHOUT author filter to get all public lists
-  /// Returns list of CuratedList objects without saving to local storage
-  Future<List<CuratedList>> fetchPublicListsFromRelays({
-    int limit = 50,
-    List<String>? searchTags,
-  }) async {
+  /// Stream public curated lists from Nostr relays for discovery
+  /// Yields lists immediately as they arrive - no waiting for EOSE
+  /// Handles deduplication by 'd' tag (keeps newest version)
+  /// Use [until] to paginate backwards (set to oldest createdAt from previous batch)
+  /// Use [limit] to control how many events to request (default: 500)
+  /// Use [excludeIds] to skip lists already known (for pagination)
+  Stream<List<CuratedList>> streamPublicListsFromRelays({
+    DateTime? until,
+    int limit = 500,
+    Set<String>? excludeIds,
+  }) async* {
     Log.info(
-      '📋 Fetching public curated lists from relays...',
+      '📋 Streaming public curated lists from relays (limit: $limit)${until != null ? ' (until: $until)' : ''}'
+      '${excludeIds != null ? ' (excluding ${excludeIds.length} known)' : ''}...',
       name: 'CuratedListService',
       category: LogCategory.system,
     );
 
-    try {
-      final completer = Completer<void>();
-      final receivedEvents = <Event>[];
+    // Track lists by d-tag for deduplication (keep newest)
+    final listsByDTag = <String, CuratedList>{};
+    final skipIds = excludeIds ?? <String>{};
+    var totalEventsReceived = 0;
+    var listsWithVideos = 0;
+    var rejectedCount = 0;
 
-      // Build filter for public lists
-      final filter = Filter(
-        kinds: [30005], // NIP-51 curated lists
-        limit: limit,
-      );
+    // Build filter - use until for pagination (convert DateTime to Unix timestamp)
+    // Include limit to ensure relays return a reasonable number of events
+    final filter = Filter(
+      kinds: [30005], // NIP-51 curated lists
+      until: until != null ? until.millisecondsSinceEpoch ~/ 1000 : null,
+      limit: limit,
+    );
 
-      // Subscribe to all public Kind 30005 events (no author filter)
-      final subscription = _nostrService.subscribe([filter]);
+    Log.info(
+      '📋 Filter: ${filter.toJson()}',
+      name: 'CuratedListService',
+      category: LogCategory.system,
+    );
 
-      // Set a timeout for the subscription
-      Timer? timeoutTimer;
-      timeoutTimer = Timer(const Duration(seconds: 10), () {
-        Log.debug(
-          'Public lists fetch timeout reached, processing received events',
+    final subscription = _nostrService.subscribe([filter]);
+
+    await for (final event in subscription) {
+      totalEventsReceived++;
+      // Log progress every 100 events (reduced spam)
+      if (totalEventsReceived % 100 == 0) {
+        Log.info(
+          '📋 Progress: $totalEventsReceived events, $listsWithVideos with videos, '
+          '$rejectedCount empty',
           name: 'CuratedListService',
           category: LogCategory.system,
         );
-        if (!completer.isCompleted) {
-          completer.complete();
-        }
-      });
+      }
+      final curatedList = _eventToCuratedList(event);
 
-      subscription.listen(
-        (event) {
-          receivedEvents.add(event);
-          Log.debug(
-            'Received public list event from relay: ${event.id}',
-            name: 'CuratedListService',
-            category: LogCategory.system,
-          );
-        },
-        onDone: () {
-          timeoutTimer?.cancel();
-          if (!completer.isCompleted) {
-            completer.complete();
-          }
-        },
-        onError: (error) {
-          Log.error(
-            'Error fetching public lists from relay: $error',
-            name: 'CuratedListService',
-            category: LogCategory.system,
-          );
-          timeoutTimer?.cancel();
-          if (!completer.isCompleted) {
-            completer.complete();
-          }
-        },
-      );
-
-      await completer.future;
-
-      // Process received events into CuratedList objects
-      final publicLists = <CuratedList>[];
-
-      if (receivedEvents.isNotEmpty) {
-        // Group events by 'd' tag to handle replaceable events (keep newest)
-        final eventsByDTag = <String, Event>{};
-
-        for (final event in receivedEvents) {
-          final dTag = _extractDTag(event);
-          if (dTag != null) {
-            // Keep only the latest event for each 'd' tag
-            final existingEvent = eventsByDTag[dTag];
-            if (existingEvent == null ||
-                event.createdAt > existingEvent.createdAt) {
-              eventsByDTag[dTag] = event;
-            }
-          }
-        }
-
-        Log.debug(
-          'Processing ${eventsByDTag.length} unique public lists from relays',
-          name: 'CuratedListService',
-          category: LogCategory.system,
-        );
-
-        // Convert events to CuratedList objects
-        for (final event in eventsByDTag.values) {
-          final curatedList = _eventToCuratedList(event);
-          if (curatedList != null) {
-            // Apply tag filter if specified
-            if (searchTags == null || searchTags.isEmpty) {
-              publicLists.add(curatedList);
-            } else {
-              // Check if list has any of the search tags
-              final hasMatchingTag = curatedList.tags.any(
-                (tag) => searchTags.contains(tag.toLowerCase()),
-              );
-              if (hasMatchingTag) {
-                publicLists.add(curatedList);
-              }
-            }
-          }
-        }
+      // Track rejected lists for summary (don't log each one)
+      if (curatedList == null || curatedList.videoEventIds.isEmpty) {
+        rejectedCount++;
       }
 
-      Log.info(
-        '✅ Public lists fetch complete. Found ${publicLists.length} lists',
-        name: 'CuratedListService',
-        category: LogCategory.system,
-      );
+      if (curatedList != null && curatedList.videoEventIds.isNotEmpty) {
+        listsWithVideos++;
+        final dTag = curatedList.id;
 
-      return publicLists;
-    } catch (e) {
-      Log.error(
-        'Failed to fetch public lists from relays: $e',
-        name: 'CuratedListService',
-        category: LogCategory.system,
-      );
-      return [];
+        // Skip lists we already know about (for pagination)
+        if (skipIds.contains(dTag)) {
+          continue;
+        }
+
+        final existing = listsByDTag[dTag];
+
+        // Keep newest version
+        if (existing == null ||
+            curatedList.updatedAt.isAfter(existing.updatedAt)) {
+          listsByDTag[dTag] = curatedList;
+
+          // Yield current accumulated list sorted by video count
+          final sortedLists = listsByDTag.values.toList()
+            ..sort(
+              (a, b) =>
+                  b.videoEventIds.length.compareTo(a.videoEventIds.length),
+            );
+          yield sortedLists;
+        }
+      }
     }
+
+    // Log final stats when stream completes
+    Log.info(
+      '📋 Stream complete: received $totalEventsReceived events, '
+      '$listsWithVideos had videos, ${listsByDTag.length} unique lists',
+      name: 'CuratedListService',
+      category: LogCategory.system,
+    );
+  }
+
+  /// Fetch public curated lists from Nostr relays for discovery (legacy)
+  /// Prefer streamPublicListsFromRelays for immediate results
+  /// WARNING: This waits forever since Nostr streams don't close - use stream version
+  Future<List<CuratedList>> fetchPublicListsFromRelays({
+    List<String>? searchTags,
+  }) async {
+    final lists = <CuratedList>[];
+    await for (final update in streamPublicListsFromRelays()) {
+      lists
+        ..clear()
+        ..addAll(update);
+    }
+
+    // Apply tag filter if specified
+    if (searchTags != null && searchTags.isNotEmpty) {
+      return lists.where((list) {
+        return list.tags.any((tag) => searchTags.contains(tag.toLowerCase()));
+      }).toList();
+    }
+
+    return lists;
   }
 
   /// Fetch public lists from any user that contain a specific video
@@ -1500,6 +1529,23 @@ class CuratedListService extends ChangeNotifier {
           case 'e':
             if (tag.length > 1) videoEventIds.add(tag[1]);
             break;
+          case 'a':
+            // Handle 'a' tags for addressable events (format: kind:pubkey:d-tag)
+            // NIP-71 video kinds: 34235 (horizontal), 34236 (vertical), 34237 (live)
+            if (tag.length > 1) {
+              final aTagValue = tag[1];
+              // Parse the coordinate to extract video reference
+              // Format: <kind>:<pubkey>:<d-tag>
+              final parts = aTagValue.split(':');
+              if (parts.length >= 3) {
+                final kind = parts[0];
+                // Accept all NIP-71 video kinds
+                if (kind == '34235' || kind == '34236' || kind == '34237') {
+                  videoEventIds.add(aTagValue);
+                }
+              }
+            }
+            break;
           case 'collaborative':
             if (tag.length > 1 && tag[1] == 'true') isCollaborative = true;
             break;
@@ -1507,6 +1553,15 @@ class CuratedListService extends ChangeNotifier {
             if (tag.length > 1) allowedCollaborators.add(tag[1]);
             break;
         }
+      }
+
+      // Only log lists that have videos (avoid spam from empty lists)
+      if (videoEventIds.isNotEmpty) {
+        Log.debug(
+          '📋 Found list "$dTag" with ${videoEventIds.length} videos',
+          name: 'CuratedListService',
+          category: LogCategory.system,
+        );
       }
 
       // Use title or fall back to content or default
@@ -1518,6 +1573,7 @@ class CuratedListService extends ChangeNotifier {
       return CuratedList(
         id: dTag,
         name: name,
+        pubkey: event.pubkey, // Creator's pubkey for attribution
         description: description ?? event.content,
         imageUrl: imageUrl,
         videoEventIds: videoEventIds,

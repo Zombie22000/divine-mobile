@@ -33,8 +33,10 @@ import 'package:openvine/screens/video_detail_screen.dart';
 import 'package:openvine/screens/video_editor_screen.dart';
 import 'package:openvine/screens/clip_manager_screen.dart';
 import 'package:openvine/screens/clip_library_screen.dart';
+import 'package:openvine/screens/curated_list_feed_screen.dart';
 import 'package:openvine/screens/developer_options_screen.dart';
 import 'package:openvine/screens/welcome_screen.dart';
+import 'package:openvine/router/route_utils.dart';
 import 'package:openvine/providers/app_providers.dart';
 import 'package:openvine/services/auth_service.dart';
 import 'package:openvine/services/video_stop_navigator_observer.dart';
@@ -93,6 +95,8 @@ int tabIndexFromLocation(String loc) {
     case 'followers':
     case 'following':
       return -1; // Non-tab routes - no bottom nav
+    case 'list':
+      return 1; // List keeps explore tab active (like hashtag)
     default:
       return 0; // fallback to home
   }
@@ -458,6 +462,29 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 ),
               ),
             ),
+          ),
+
+          // CURATED LIST route (NIP-51 kind 30005 video lists)
+          GoRoute(
+            path: '/list/:listId',
+            name: 'list',
+            builder: (ctx, st) {
+              final listId = st.pathParameters['listId'];
+              if (listId == null || listId.isEmpty) {
+                return Scaffold(
+                  appBar: AppBar(title: const Text('Error')),
+                  body: const Center(child: Text('Invalid list ID')),
+                );
+              }
+              // Extra data contains listName, videoIds, authorPubkey
+              final extra = st.extra as CuratedListRouteExtra?;
+              return CuratedListFeedScreen(
+                listId: listId,
+                listName: extra?.listName ?? 'List',
+                videoIds: extra?.videoIds,
+                authorPubkey: extra?.authorPubkey,
+              );
+            },
           ),
         ],
       ),
