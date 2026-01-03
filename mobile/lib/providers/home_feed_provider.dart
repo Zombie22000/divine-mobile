@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:openvine/models/video_event.dart';
 import 'package:openvine/providers/app_providers.dart';
 import 'package:openvine/providers/user_profile_providers.dart';
+import 'package:openvine/services/subscribed_list_video_cache.dart';
 import 'package:openvine/services/video_event_service.dart';
 import 'package:openvine/services/video_filter_builder.dart';
 import 'package:openvine/state/video_feed_state.dart';
@@ -151,6 +152,29 @@ class HomeFeed extends _$HomeFeed {
       followingSubscription.cancel();
     });
 
+    // Watch subscribedListVideoCache - provider will rebuild when cache changes
+    // We listen to the cache's ChangeNotifier to invalidate when list videos change
+    final subscribedListCacheForListener = ref.watch(
+      subscribedListVideoCacheProvider,
+    );
+    if (subscribedListCacheForListener != null) {
+      void onCacheChanged() {
+        Log.debug(
+          '🏠 HomeFeed: SubscribedListVideoCache updated, refreshing from service',
+          name: 'HomeFeedProvider',
+          category: LogCategory.video,
+        );
+        if (ref.mounted) {
+          refreshFromService();
+        }
+      }
+
+      subscribedListCacheForListener.addListener(onCacheChanged);
+      ref.onDispose(() {
+        subscribedListCacheForListener.removeListener(onCacheChanged);
+      });
+    }
+
     Log.info(
       '🏠 HomeFeed: BUILD #$buildId - User is following ${followingPubkeys.length} people',
       name: 'HomeFeedProvider',
@@ -279,6 +303,39 @@ class HomeFeed extends _$HomeFeed {
       category: LogCategory.video,
     );
 
+    // Track IDs of videos from followed users for deduplication
+    final followingVideoIds = followingVideos.map((v) => v.id).toSet();
+
+    // Merge videos from subscribed curated lists
+    final subscribedListCache = ref.read(subscribedListVideoCacheProvider);
+    final subscribedVideos = subscribedListCache?.getVideos() ?? [];
+
+    // Track which videos are ONLY from subscribed lists (not from follows)
+    // and map each video to its source list(s)
+    final listOnlyVideoIds = <String>{};
+    final videoListSources = <String, Set<String>>{};
+
+    for (final video in subscribedVideos) {
+      final listIds = subscribedListCache?.getListsForVideo(video.id) ?? {};
+      if (listIds.isNotEmpty) {
+        videoListSources[video.id] = listIds;
+
+        if (!followingVideoIds.contains(video.id)) {
+          // Video is ONLY in feed because of subscribed list, not from follows
+          listOnlyVideoIds.add(video.id);
+          followingVideos.add(video);
+        }
+      }
+    }
+
+    if (listOnlyVideoIds.isNotEmpty) {
+      Log.info(
+        '🏠 HomeFeed: Merged ${listOnlyVideoIds.length} videos from subscribed lists',
+        name: 'HomeFeedProvider',
+        category: LogCategory.video,
+      );
+    }
+
     // Filter out WebM videos on iOS/macOS (not supported by AVPlayer)
     final beforeFilter = followingVideos.length;
     followingVideos = followingVideos
@@ -331,6 +388,8 @@ class HomeFeed extends _$HomeFeed {
       isLoadingMore: false,
       error: null,
       lastUpdated: DateTime.now(),
+      videoListSources: videoListSources,
+      listOnlyVideoIds: listOnlyVideoIds,
     );
 
     // Register for video update callbacks to auto-refresh when any video is updated
@@ -488,6 +547,29 @@ class HomeFeed extends _$HomeFeed {
     final videoEventService = ref.read(videoEventServiceProvider);
     var updatedVideos = List<VideoEvent>.from(videoEventService.homeFeedVideos);
 
+    // Track IDs of videos from followed users for deduplication
+    final followingVideoIds = updatedVideos.map((v) => v.id).toSet();
+
+    // Merge videos from subscribed curated lists
+    final subscribedListCache = ref.read(subscribedListVideoCacheProvider);
+    final subscribedVideos = subscribedListCache?.getVideos() ?? [];
+
+    // Track which videos are ONLY from subscribed lists (not from follows)
+    final listOnlyVideoIds = <String>{};
+    final videoListSources = <String, Set<String>>{};
+
+    for (final video in subscribedVideos) {
+      final listIds = subscribedListCache?.getListsForVideo(video.id) ?? {};
+      if (listIds.isNotEmpty) {
+        videoListSources[video.id] = listIds;
+
+        if (!followingVideoIds.contains(video.id)) {
+          listOnlyVideoIds.add(video.id);
+          updatedVideos.add(video);
+        }
+      }
+    }
+
     // Apply same filtering as build()
     updatedVideos = updatedVideos
         .where((v) => v.isSupportedOnCurrentPlatform)
@@ -506,6 +588,8 @@ class HomeFeed extends _$HomeFeed {
         hasMoreContent: updatedVideos.length >= 10,
         isLoadingMore: false,
         lastUpdated: DateTime.now(),
+        videoListSources: videoListSources,
+        listOnlyVideoIds: listOnlyVideoIds,
       ),
     );
   }
