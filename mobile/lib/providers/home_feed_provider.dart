@@ -216,7 +216,8 @@ class HomeFeed extends _$HomeFeed {
       await videoEventService.subscribeToHomeFeed(
         followingPubkeys,
         limit: 100,
-        sortBy: VideoSortField.createdAt, // Newest videos first (timeline order)
+        sortBy:
+            VideoSortField.createdAt, // Newest videos first (timeline order)
         force: true,
       );
       Log.info(
@@ -301,6 +302,7 @@ class HomeFeed extends _$HomeFeed {
         void onCacheUpdate() {
           checkCache();
         }
+
         subscribedListCacheForListener.addListener(onCacheUpdate);
 
         // Clean up listener when done
@@ -309,8 +311,8 @@ class HomeFeed extends _$HomeFeed {
         });
       }
 
-      // Maximum wait time of 5 seconds
-      Timer(const Duration(seconds: 5), () {
+      // Maximum wait time of 2 seconds (first video notifies immediately now)
+      Timer(const Duration(seconds: 2), () {
         checkTimer?.cancel();
         if (!completer.isCompleted) {
           completer.complete();

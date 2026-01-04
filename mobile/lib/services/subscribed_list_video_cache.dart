@@ -38,6 +38,9 @@ class SubscribedListVideoCache extends ChangeNotifier {
   /// Timer for debouncing notifications when videos stream in
   Timer? _notifyDebounceTimer;
 
+  /// Track if we've notified at least once for immediate first-video response
+  bool _hasNotifiedOnce = false;
+
   @override
   void dispose() {
     _notifyDebounceTimer?.cancel();
@@ -169,9 +172,23 @@ class SubscribedListVideoCache extends ChangeNotifier {
     _scheduleNotify();
   }
 
-  /// Debounced notification - waits 100ms for more videos before notifying
-  /// This allows videos to stream in without causing excessive rebuilds
+  /// Smart notification strategy:
+  /// - First video: notify immediately so UI shows content ASAP
+  /// - Subsequent videos: debounce 100ms to batch updates and reduce rebuilds
   void _scheduleNotify() {
+    if (!_hasNotifiedOnce) {
+      // First video - notify immediately for fast initial display
+      _hasNotifiedOnce = true;
+      Log.debug(
+        'First video arrived - notifying immediately',
+        name: 'SubscribedListVideoCache',
+        category: LogCategory.video,
+      );
+      notifyListeners();
+      return;
+    }
+
+    // Subsequent videos - debounce to batch updates
     _notifyDebounceTimer?.cancel();
     _notifyDebounceTimer = Timer(const Duration(milliseconds: 100), () {
       notifyListeners();
@@ -238,10 +255,10 @@ class SubscribedListVideoCache extends ChangeNotifier {
     final eventStream = _nostrService.subscribe(filters);
     final seenIds = <String>{};
 
-    // Use 5 second timeout for relay fetches
+    // Use 3 second timeout for relay fetches (faster initial load)
     try {
       await for (final event in eventStream.timeout(
-        const Duration(seconds: 5),
+        const Duration(seconds: 3),
       )) {
         if (seenIds.contains(event.id)) continue;
         seenIds.add(event.id);
