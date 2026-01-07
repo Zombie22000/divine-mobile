@@ -139,15 +139,17 @@ class VideoErrorOverlay extends ConsumerWidget {
                           // If user swiped away during verification, don't invalidate -
                           // the new active video's controller is already correct
                           // NOTE: activeVideoIdProvider returns stableId (vineId ?? id),
-                          // so we must compare against video.stableId, not video.id
+                          // but we check both to be defensive against future changes.
                           final activeVideoId = ref.read(activeVideoIdProvider);
+                          final isThisVideoActive = activeVideoId == video.stableId ||
+                              activeVideoId == video.id;
                           Log.info(
-                            '🔐 [AGE-GATE] Checking active video: activeVideoId=$activeVideoId, thisVideoStableId=${video.stableId}, match=${activeVideoId == video.stableId}',
+                            '🔐 [AGE-GATE] Checking active video: activeVideoId=$activeVideoId, stableId=${video.stableId}, id=${video.id}, match=$isThisVideoActive',
                             name: 'VideoErrorOverlay',
                             category: LogCategory.video,
                           );
 
-                          if (activeVideoId == video.stableId) {
+                          if (isThisVideoActive) {
                             // Video is still active - safe to invalidate and retry
                             if (context.mounted) {
                               Log.info(
@@ -165,7 +167,7 @@ class VideoErrorOverlay extends ConsumerWidget {
                             // User swiped to different video during verification
                             // Auth headers are cached, so when user swipes back, it will work
                             Log.debug(
-                              'Age verification completed but video no longer active (active=$activeVideoId, this=${video.stableId})',
+                              'Age verification completed but video no longer active (active=$activeVideoId, stableId=${video.stableId}, id=${video.id})',
                               name: 'VideoErrorOverlay',
                               category: LogCategory.video,
                             );
