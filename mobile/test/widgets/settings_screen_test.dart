@@ -2,13 +2,13 @@
 // ABOUTME: Verifies settings navigation and UI structure
 
 import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
+import 'package:openvine/providers/app_providers.dart';
 import 'package:openvine/screens/settings_screen.dart';
 import 'package:openvine/services/auth_service.dart';
-import 'package:openvine/providers/app_providers.dart';
 
 @GenerateMocks([AuthService])
 import 'settings_screen_test.mocks.dart';
@@ -20,6 +20,11 @@ void main() {
     setUp(() {
       mockAuthService = MockAuthService();
       when(mockAuthService.isAuthenticated).thenReturn(true);
+      when(mockAuthService.currentPublicKeyHex).thenReturn('test_pubkey');
+      when(mockAuthService.authState).thenReturn(AuthState.authenticated);
+      when(
+        mockAuthService.authStateStream,
+      ).thenAnswer((_) => Stream.value(AuthState.authenticated));
     });
 
     testWidgets('Settings screen displays all sections', (tester) async {
@@ -90,10 +95,60 @@ void main() {
           child: const MaterialApp(home: SettingsScreen()),
         ),
       );
+      await tester.pumpAndSettle();
 
       expect(find.text('Settings'), findsOneWidget);
       final appBar = tester.widget<AppBar>(find.byType(AppBar));
       expect(appBar.backgroundColor, isNotNull);
+
+      // Dispose and pump to clear any pending timers from overlay visibility
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+    });
+
+    testWidgets('Settings screen reorganizes dev and danger items', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [authServiceProvider.overrideWithValue(mockAuthService)],
+          child: const MaterialApp(home: SettingsScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Preferences should be near the top (after Profile)
+      expect(find.text('PREFERENCES'), findsOneWidget);
+
+      // Scroll to find Developer Options under Network section
+      await tester.scrollUntilVisible(
+        find.text('Developer Options'),
+        100,
+        scrollable: find.byType(Scrollable),
+      );
+      await tester.pumpAndSettle();
+
+      // Developer Options should always be visible (not hidden behind 7-tap)
+      expect(find.text('Developer Options'), findsOneWidget);
+
+      // Scroll to find Account section at the bottom with key management
+      await tester.scrollUntilVisible(
+        find.text('Key Management'),
+        100,
+        scrollable: find.byType(Scrollable),
+      );
+      await tester.pumpAndSettle();
+
+      // Account section should have all key/account related items together
+      expect(find.text('ACCOUNT'), findsOneWidget);
+      expect(find.text('Log Out'), findsOneWidget);
+      expect(find.text('Key Management'), findsOneWidget);
+      expect(find.text('Remove Keys from Device'), findsOneWidget);
+      expect(find.text('Delete Account and Data'), findsOneWidget);
+
+      // Dispose and pump to clear any pending timers from overlay visibility
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
     });
   });
 }

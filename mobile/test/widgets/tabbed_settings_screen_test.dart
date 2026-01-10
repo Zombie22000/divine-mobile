@@ -6,13 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
+import 'package:nostr_client/nostr_client.dart';
 import 'package:openvine/providers/app_providers.dart';
 import 'package:openvine/providers/nostr_client_provider.dart';
 import 'package:openvine/screens/settings_screen.dart';
 import 'package:openvine/services/auth_service.dart';
 import 'package:openvine/services/blossom_upload_service.dart';
 import 'package:openvine/services/bug_report_service.dart';
-import 'package:nostr_client/nostr_client.dart';
 import 'package:openvine/services/notification_service_enhanced.dart';
 
 import 'tabbed_settings_screen_test.mocks.dart';
@@ -41,6 +41,10 @@ void main() {
     // Default mock behaviors
     when(mockAuthService.isAuthenticated).thenReturn(true);
     when(mockAuthService.currentPublicKeyHex).thenReturn('test_pubkey');
+    when(mockAuthService.authState).thenReturn(AuthState.authenticated);
+    when(
+      mockAuthService.authStateStream,
+    ).thenAnswer((_) => Stream.value(AuthState.authenticated));
     when(mockNostrService.configuredRelays).thenReturn([]);
     when(mockBlossomService.isBlossomEnabled()).thenAnswer((_) async => false);
     when(mockBlossomService.getBlossomServer()).thenAnswer((_) async => null);
@@ -179,12 +183,24 @@ void main() {
       await tester.pumpWidget(createTestWidget());
       await tester.pumpAndSettle();
 
+      // Key Management is in Account section at the bottom, need to scroll
+      await tester.scrollUntilVisible(
+        find.text('Key Management'),
+        100,
+        scrollable: find.byType(Scrollable),
+      );
+      await tester.pumpAndSettle();
+
       // Should have Key Management button that navigates
       expect(find.text('Key Management'), findsOneWidget);
       expect(
         find.text('Export, backup, and restore your Nostr keys'),
         findsOneWidget,
       );
+
+      // Dispose and pump to clear any pending timers from overlay visibility
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
     });
   });
 
